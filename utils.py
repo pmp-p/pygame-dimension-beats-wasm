@@ -1,12 +1,16 @@
 import math
+import os
 import time
+from config import ASSETS
 from functools import lru_cache
 from typing import Literal
 
 import pygame
 
-# FONT = os.path.abspath(os.path.join(ASSETS, 'ARCADECLASSIC.TTF'))
-FONT = 'consolas'
+FONT = os.path.abspath(os.path.join(ASSETS, 'fonts', 'ARCADECLASSIC (1).TTF'))
+
+
+# FONT = 'consolas'
 
 
 def clamp(value, mini, maxi):
@@ -43,11 +47,12 @@ def load_image(path: str, alpha: bool = True, scale=1.0, color_key=None):
 
 @lru_cache(maxsize=10)
 def font(size):
-    return pygame.font.SysFont(FONT, size)
+    return pygame.font.Font(FONT, size)
 
 
 @lru_cache(maxsize=100)
-def text(msg, size=50, color=(255, 255, 255), aliased=False):
+def text(msg: str, size=50, color=(255, 255, 255), aliased=False):
+    msg = msg.replace(' ', '   ')
     return font(size).render(msg, aliased, color)
 
 
@@ -57,6 +62,9 @@ class Timer:
         self.timer = time.time()
         self.paused_timer = time.time()
         self.paused = False
+
+    def reset(self):
+        self.timer = time.time()
 
     def pause(self):
         self.paused = True
