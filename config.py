@@ -9,14 +9,36 @@ Hence the structure needs to be javascript[p5.js] compatible
 import os
 import sys
 
-WIDTH = 1280  # width of the screen
-HEIGHT = 720  # height of the screen
+import pygame
+
+WIDTH = 800  # width of the screen
+HEIGHT = 600  # height of the screen
 
 VOLUME = 100  # sound volume
 
 FPS = 60
 
 ASSETS = 'assets'
+
+
+class Globals:
+    _config = {}
+
+    @classmethod
+    def pop(cls, key):
+        try:
+            cls._config.pop(key)
+        except KeyError:
+            pass
+
+    @classmethod
+    def set(cls, key, value):
+        cls._config[key] = value
+
+    @classmethod
+    def get(cls, key):
+        return cls._config.get(key)
+
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     print('running in a PyInstaller bundle')
