@@ -40,7 +40,7 @@ class SoundManager:
             if not pygame.mixer.Channel(i).get_busy():
                 self.current = sound
                 pygame.mixer.Channel(i).play(pygame.mixer.Sound(self.config[sound]))
-                # pygame.mixer.Channel(i).set_volume(0)
+                pygame.mixer.Channel(i).set_volume(0)
                 return
         if sound == self.current and pygame.mixer.music.get_busy():
             return
