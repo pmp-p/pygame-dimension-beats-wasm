@@ -11,8 +11,8 @@ import sys
 
 import pygame
 
-WIDTH = 800  # width of the screen
-HEIGHT = 600  # height of the screen
+WIDTH = int(800 * 1.0)  # width of the screen
+HEIGHT = int(600 * 1.0)  # height of the screen
 
 VOLUME = 100  # sound volume
 
