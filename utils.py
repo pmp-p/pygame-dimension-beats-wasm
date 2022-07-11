@@ -57,11 +57,13 @@ def text(msg: str, size=50, color=(255, 255, 255), aliased=False):
 
 
 class Timer:
-    def __init__(self, timeout=0.0):
+    def __init__(self, timeout=0.0, callback=None):
         self.timeout = timeout
         self.timer = time.time()
         self.paused_timer = time.time()
         self.paused = False
+        self.callback_done = False
+        self.callable = callback
 
     def reset(self):
         self.timer = time.time()
@@ -84,9 +86,36 @@ class Timer:
     def tick(self):
         if self.elapsed > self.timeout:
             self.timer = time.time()  # reset timer
+            if self.callable is not None:
+                self.callable()
             return True
         else:
             return False
+
+
+class TimerSequence:
+    def __init__(self, timestamps):
+        # timestamps -> list [ list [ str (name), float (time), callback[optional] ] ]
+        self.timestamps = timestamps
+        self.current = timestamps.pop(0)
+        self.current_timer = Timer(self.current[1])
+
+    def update(self):
+        if self.current and self.current_timer:
+            if self.current_timer.tick:
+                try:
+                    self.current = self.timestamps.pop(0)
+                    self.current = Timer(self.current[1])
+                except IndexError:
+                    self.current_timer = None
+                    self.current = None
+
+    @property
+    def phase(self):
+        if self.current:
+            return self.current[0]
+        else:
+            return 'none'
 
 
 class SpriteSheet:

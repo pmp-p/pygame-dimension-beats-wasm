@@ -38,6 +38,10 @@ class Player(BaseObject):
         self.size = 15
         self.z = 1
 
+    @property
+    def rect(self):
+        return pygame.Rect(self.x - self.size // 2, self.y - self.size // 2, self.size, self.size)
+
     def update(self, events: list[pygame.event.Event]):
         speed = 5
         keys = pygame.key.get_pressed()
@@ -56,7 +60,7 @@ class Player(BaseObject):
         self.y = clamp(self.y, offset, HEIGHT - offset)
 
     def draw(self, surf: pygame.Surface):
-        pygame.draw.rect(surf, 'blue', (self.x - self.size // 2, self.y - self.size // 2, self.size, self.size))
+        pygame.draw.rect(surf, 'blue', self.rect)
 
 
 class PointBullet(BaseObject):
@@ -68,6 +72,13 @@ class PointBullet(BaseObject):
         self.dy = dy
         self.speed = 2
         self.r = 5
+
+    @property
+    def rect(self):
+        return pygame.Rect(self.x - self.r // 2, self.y - self.r // 2, self.r * 2, self.r * 2).inflate(-2, -2)
+
+    def check_collision(self, player: 'Player'):
+        return player.rect.inflate(-5, -5).colliderect(self.rect)
 
     def update(self, events: list[pygame.event.Event]):
         self.x += self.dx * self.speed
@@ -170,7 +181,7 @@ class BulletEnemy(Enemy):
         self.x = x
         self.y = y
         self.r = 10
-        self.phase = 5
+        self.phase = 0
         self.phase_timer = Timer(5)
         self.bullet_timer = Timer(0.5)
         self.z = 1
@@ -290,11 +301,106 @@ class PointClicked(BaseObject):
             pygame.draw.circle(surf, 'white', (self.x, self.y), self.r, 10 - self.r // 10 + 1)
 
 
+# TODO
+
+
+class TriangleBullet(BaseObject):
+    ANGULAR_VEL = 20
+    VEL = 20
+    COLOUR = "RED"
+    BORDER_COLOUR = "WHITE"
+    SIDE_LENGTH = 10
+    BORDER_WIDTH = 2
+
+    def __init__(self, c_pos):
+        super().__init__()
+        self.c_pos = c_pos
+        self._dir = c_pos.rotate(90)
+        print(177)
+        self.vers = []
+        self.generate_vertices()
+
+    def generate_vertices(self):
+        vec1 = pygame.Vector2(0, -self.SIDE_LENGTH)
+        vec2 = pygame.Vector2(0, -self.SIDE_LENGTH - self.BORDER_WIDTH)
+        self.vers = [
+            vec1,
+            vec1.rotate(120),
+            vec1.rotate(240),
+            vec2,
+            vec2.rotate(120),
+            vec2.rotate(240),
+        ]
+
+    def update(self, dt=0.16):
+        print(194)
+        for vec in self.vers:
+            vec.rotate_ip(self.ANGULAR_VEL * dt)
+            vec.xy += self._dir * (self.VEL * dt)
+
+    def draw(self, surf: pygame.Surface):
+        pygame.draw.polygon(surf, self.COLOUR, (self.vers[:3]))
+        pygame.draw.polygon(surf, self.BORDER_COLOUR, (self.vers[3:]))
+
+
+class TriangleEnemy(Enemy):
+    ANGULAR_VEL = 20
+    COLOUR = "RED"
+    BORDER_COLOUR = "WHITE"
+    SIDE_LENGTH = 50
+    BORDER_WIDTH = 5
+
+    def __init__(self, c_pos=(WIDTH // 2, HEIGHT // 2)):
+        super().__init__()
+        self.c_pos = pygame.Vector2(c_pos)
+        self.a = False
+        self.current_ver = 0
+
+        self.phase = 0
+        self.phase_timer = Timer(10)
+        self.bullet_timer = Timer(0.5)
+        self.vers = []
+        self.generate_vertices()
+        # self.vers = []
+
+    def generate_vertices(self):
+        vec1 = pygame.Vector2(0, -self.SIDE_LENGTH)
+        vec2 = pygame.Vector2(0, -self.SIDE_LENGTH - self.BORDER_WIDTH)
+        self.vers = [
+            vec1,
+            vec1.rotate(120),
+            vec1.rotate(240),
+            vec2,
+            vec2.rotate(120),
+            vec2.rotate(240),
+        ]
+
+    def update(self, dt=0.16):
+        for vec in self.vers:
+            vec.rotate_ip(self.ANGULAR_VEL * dt)
+
+        if self.bullet_timer.tick:
+            self.object_manager.add(
+                TriangleBullet(self.vers[self.current_ver])
+            )
+            self.current_ver += 1
+            if self.current_ver == 3:
+                self.current_ver = 0
+
+    def draw(self, surf: pygame.Surface):
+        pygame.draw.polygon(surf, self.COLOUR, (self.vers[:3]))
+        pygame.draw.polygon(surf, self.BORDER_COLOUR, (self.vers[3:]))
+
+
+# TODO
+
+
 class ObjectManager:
     def __init__(self):
         self.objects: list[BaseObject] = []
         self._to_add: list[BaseObject] = []
         self.player = None
+        self.player_pos = [0, 0]
 
     def get_object_count(self, instance):
         c = 0
@@ -303,14 +409,23 @@ class ObjectManager:
                 c += 1
         return c
 
+    def clear_only_objects(self):
+        self._to_add.clear()
+        self.objects.clear()
+
     def clear(self):
         self._to_add.clear()
         self.objects.clear()
+        if self.player:
+            self.player_pos = [self.player.x, self.player.y]
         self.player = None
 
     def init(self):
         self.clear()
-        self.player = Player(WIDTH // 2, HEIGHT // 2 + 150)
+        if not self.player:
+            self.player = Player(WIDTH // 2, HEIGHT // 2 + 150)
+        else:
+            self.player = Player(*self.player_pos)
 
     def add(self, _object: BaseObject):
         _object.object_manager = self
@@ -330,7 +445,8 @@ class ObjectManager:
         # print(self.get_object_count(Player))
         for i in self.objects:
             # i.update(events)
-            i.check_collision(self.player)
+            if i.check_collision(self.player):
+                self.player.alive = False
             if isinstance(i, Enemy):
                 i.use_ai(self.player)
             else:

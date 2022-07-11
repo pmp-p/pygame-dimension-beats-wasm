@@ -6,20 +6,29 @@ from utils import *
 from constants import *
 from sounds import SoundManager
 
+music_init = False
+
 try:
     pygame.init()
+    music_init = True
 except pygame.error:
     try:
         pygame.mixer.init()
-        SoundManager.init = True
+        music_init = True
     except pygame.error:
-        SoundManager.init = False
+        music_init = False
 
 pygame.key.set_repeat(500, 100)
 
 
+# setting global variables default value
+
 Globals.set(FIRST_TIME_PLAYED, False)
 Globals.set(FULL_PLAYED, False)
+Globals.set(RETRY_MESSAGE, '')
+Globals.set(CURRENT_LEVEL, '')
+Globals.set(MUSIC_INIT, music_init)
+
 
 # TODO add subtitle manager
 

@@ -1,6 +1,7 @@
 import pygame
 
 from config import WIDTH, HEIGHT
+from utils import clamp
 
 
 class Transition:
@@ -52,7 +53,7 @@ class SquareTransition(Transition):
     def __init__(self):
         super().__init__()
         self.size = 75
-        self.multiplier = 1
+        self.multiplier = 5
         self.squares = [
             [0 for _ in range(WIDTH // self.size + 1)] for _ in range(HEIGHT // self.size + 1)
         ]
@@ -64,6 +65,7 @@ class SquareTransition(Transition):
         for row in range(len(self.squares)):
             for col in range(len(self.squares[row])):
                 self.squares[row][col] += self.k
+                # print(self.k)
                 if self.squares[row][col] > self.size:
                     self.squares[row][col] = self.size
                 if self.squares[row][col] < 0:
@@ -73,14 +75,16 @@ class SquareTransition(Transition):
         for row in range(len(self.squares)):
             for col in range(len(self.squares[row])):
                 size = self.squares[row][col]
+                # print(size, self.squares)
                 pygame.draw.rect(surf, 'black', (col * self.size + self.size // 2 - size // 2, row * self.size + self.size // 2 - size // 2, size, size))
+                pygame.draw.rect(surf, 'white', (col * self.size + self.size // 2 - size // 2, row * self.size + self.size // 2 - size // 2, size, size), 2)
 
 
 class CircleTransition(Transition):
     def __init__(self):
         super().__init__()
-        self.size = 75
-        self.multiplier = 1
+        self.size = 50
+        self.multiplier = 2.5
         self.circles = [
             [0 for _ in range(WIDTH // self.size + 1)] for _ in range(HEIGHT // self.size + 1)
         ]
@@ -101,15 +105,37 @@ class CircleTransition(Transition):
         for row in range(len(self.circles)):
             for col in range(len(self.circles[row])):
                 size = self.circles[row][col]
-                pygame.draw.circle(surf, 'black', (col * self.size, row * self.size), size)
+                pygame.draw.circle(surf, 'black', (col * self.size, row * self.size), size * 0.55)
+                pygame.draw.circle(surf, 'white', (col * self.size, row * self.size), size * 0.55, 2)
+
+
+class FadeTransition(Transition):
+    def __init__(self):
+        super().__init__()
+        self.size = 255
+        self.alpha = 0
+        self.multiplier = 4
+        self.surf = pygame.Surface((WIDTH, HEIGHT))
+
+    def get_size(self) -> int:
+        return self.alpha
+
+    def update(self):
+        self.alpha += self.multiplier * self.k
+        self.alpha = clamp(self.alpha, 0, 255)
+        self.surf.set_alpha(self.alpha)
+
+    def draw(self, surf: pygame.Surface):
+        surf.blit(self.surf, (0, 0))
 
 
 class TransitionManager:
     def __init__(self):
-        self.transition: Transition = SquareTransition()
+        self.transition: Transition = CircleTransition()
         self.transitions = {
             'square': SquareTransition,
             'circle': CircleTransition,
+            'fade': FadeTransition,
         }
 
     def close(self):
@@ -120,7 +146,9 @@ class TransitionManager:
 
     def set_transition(self, transition):
         if transition in self.transitions:
-            self.transition = self.transitions[transition]()
+            if type(self.transition) != self.transitions[transition]:
+                self.transition = self.transitions[transition]()
+            # print(self.transition)
 
     def update(self, events: list[pygame.event.Event]):
         self.transition.update()

@@ -23,6 +23,11 @@ class Menu:
         self.background = 'black'
         self.manager.subtitle_manager.clear()
         self.manager.object_manager.clear()
+        Globals.set(PREVIOUS_LEVEL, Globals.get(CURRENT_LEVEL))
+        Globals.set(CURRENT_LEVEL, self.name)
+
+    def reset(self):
+        self.__init__(self.manager, self.name)
 
     def update(self, events: list[pygame.event.Event]):
         pass
@@ -40,13 +45,14 @@ class Home(Menu):
         self.options = [
             'quit', 'help', 'settings', 'play'
         ]
+        self.manager.transition_manager.set_transition('fade')
         self.actions = [
             lambda: self.manager.switch_mode('quit'),
-            lambda: self.manager.switch_mode('help'),
+            lambda: self.manager.switch_mode('help', transition=True),
             lambda: ...,
-            lambda: self.manager.switch_mode('point')
+            lambda: self.manager.switch_mode('point', transition=True)
         ]
-        self.selected = -1
+        self.selected = 3
 
     def update(self, events: list[pygame.event.Event]):
         for e in events:
@@ -54,13 +60,14 @@ class Home(Menu):
                 if e.key == pygame.K_DOWN:
                     self.selected += 1
                     self.selected %= len(self.options)
-                    SoundManager.play('ping')
+                    self.manager.sound_manager.play_sound('ping')
                 if e.key == pygame.K_UP:
                     self.selected -= 1
                     self.selected %= len(self.options)
-                    SoundManager.play('ping')
+                    self.manager.sound_manager.play_sound('ping')
                 if e.key == pygame.K_RETURN or e.key == pygame.K_KP_ENTER:
                     try:
+                        self.manager.transition_manager.set_transition('fade')
                         self.actions[self.selected]()
                     except IndexError:
                         self.manager.switch_mode('game', reset=True, transition=False)
@@ -166,15 +173,79 @@ class Intro(Menu):
         surf.fill(self.background)
 
 
+class Retry(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        message = Globals.get(RETRY_MESSAGE) or ''
+        # self.manager.subtitle_manager.add(
+        #     Subtitle(message + '', time='inf', pos=(WIDTH // 2, 100))
+        # )
+        for i in get_typed_subtitles(message, _time='inf', pos=(WIDTH // 2, 150), callback=lambda: Globals.set(RETRY_MESSAGE, '')):
+            self.manager.subtitle_manager.add(i)
+        self.input_enabled = False
+        self.message = 'Retry ?'
+        self.options = ['Yes', 'No']
+
+        def go_prev():
+            self.manager.transition_manager.set_transition('fade')
+            self.manager.switch_mode(Globals.get(PREVIOUS_LEVEL), transition=True)
+
+        def go_main_menu():
+            self.manager.transition_manager.set_transition('fade')
+            self.manager.switch_mode('home', transition=True)
+
+        self.actions = [go_prev, go_main_menu]
+        self.selected = 0
+
+    def update(self, events: list[pygame.event.Event]):
+        if Globals.get(RETRY_MESSAGE) == '':
+            self.input_enabled = True
+        if self.input_enabled:
+            for e in events:
+                if e.type == pygame.KEYDOWN:
+                    if e.key == pygame.K_LEFT:
+                        self.selected -= 1
+                        self.selected %= len(self.options)
+                    if e.key == pygame.K_RIGHT:
+                        self.selected += 1
+                        self.selected %= len(self.options)
+                    if e.key == pygame.K_RETURN:
+                        try:
+                            self.manager.subtitle_manager.clear()
+                            self.actions[self.selected]()
+                        except IndexError:
+                            pass
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(self.background)
+        t = text(self.message)
+        surf.blit(t, t.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+        x1 = WIDTH / 4
+        x2 = WIDTH * 3 / 4
+        t = text(self.options[0], color='orange' if self.selected == 0 else 'white')
+        surf.blit(t, t.get_rect(center=(x1, HEIGHT // 2 + 150)))
+        t = text(self.options[1], color='orange' if self.selected == 1 else 'white')
+        surf.blit(t, t.get_rect(center=(x2, HEIGHT // 2 + 150)))
+
+
 class PointEnemyScene(Menu):
     def __init__(self, manager: 'MenuManager', name='menu'):
         super().__init__(manager, name)
         self.manager.object_manager.init()
         self.manager.object_manager.add(BulletEnemy())
+        self.manager.sound_manager.stop()
+        self.manager.sound_manager.play('points')
 
     def update(self, events: list[pygame.event.Event]):
-        if not self.manager.object_manager.objects:
-            self.manager.switch_mode('line')
+        if not self.manager.object_manager.player.alive:
+            # print(self.name)
+            # self.reset()
+            Globals.set(RETRY_MESSAGE, 'You are such a noob!')
+            self.manager.transition_manager.set_transition('square')
+            self.manager.switch_mode('retry', reset=True, transition=True)
+            self.manager.sound_manager.fade(500)
+        # if not self.manager.object_manager.objects:
+        #     self.manager.switch_mode('line')
 
     def draw(self, surf: pygame.Surface):
         surf.fill(self.background)
@@ -194,43 +265,70 @@ class LineEnemyScene(Menu):
         surf.fill(self.background)
 
 
+class TriangleEnemyScene(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        self.manager.object_manager.init()
+        self.manager.object_manager.add(TriangleEnemy())
+
+    def update(self, events: list[pygame.event.Event]):
+        pass
+        # if not self.manager.object_manager.objects:
+        #     self.manager.switch_mode('home')
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(self.background)
+
+
 class MenuManager:
+    # TODO implement StackBasedGameLoop
+
     def __init__(self):
         self.to_switch = 'none'  # to switch menu after transition
         self.to_reset = False
         self.transition_manager: TransitionManager = TransitionManager()
         self.subtitle_manager: SubtitleManager = SubtitleManager()
         self.object_manager: ObjectManager = ObjectManager()
+        self.sound_manager = SoundManager()
         self.menus = {
-            'home': Home(self, 'Dimensions'),
+            'home': Home(self, 'home'),
             'game': Game(self, 'game'),
             'intro': Intro(self, 'intro'),
             'quit': Quit(self, 'quit'),
             'help': Help(self, 'help'),
 
+            'retry': Retry(self, 'retry'),
+
             'point': PointEnemyScene(self, 'point'),
             'line': LineEnemyScene(self, 'line'),
+            'triangle': TriangleEnemyScene(self, 'triangle')
 
         }
         self.subtitle_manager.clear()
         self.object_manager.clear()
-        self.mode = 'home'
+        self.mode = 'triangle'  # initial mode
         self.menu = self.menus[self.mode]
-        self.menu.__init__(self, self.menu.name)
+        self.menu.reset()
+        self.sound_manager.stop()
+
+    def reset(self):
+        self.__init__()
 
     def switch_mode(self, mode, reset=True, transition=False):
         if mode in self.menus:
             if transition:
                 self.to_switch = mode
+                self.to_reset = reset
                 self.transition_manager.close()
             else:
                 self.mode = mode
                 self.menu = self.menus[self.mode]
                 if reset:
-                    self.menu.__init__(self, self.menu.name)
+                    self.menu.reset()
             # self.subtitle_manager.clear()
 
     def update(self, events: list[pygame.event.Event]):
+        # print(self.transition_manager.transition.k)
         for e in events:
             if e.type == pygame.MOUSEBUTTONDOWN:
                 if e.button == 1:
@@ -253,4 +351,4 @@ class MenuManager:
         self.object_manager.draw(surf)
         self.transition_manager.draw(surf)
         self.subtitle_manager.draw(surf)
-        # surf.blit(text(self.transition_manager.transition.status), (0, 0))
+        # surf.blit(text(self.transition_manager.transition.status, color='black'), (0, 0))
