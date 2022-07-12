@@ -268,13 +268,22 @@ class LineEnemyScene(Menu):
         super().__init__(manager, name)
         self.manager.object_manager.init()
         self.manager.object_manager.add(LineEnemy())
+        self.manager.sound_manager.stop()
+        self.manager.sound_manager.play('lines', start=0)
+        self.theme_color = 'blue'
 
     def update(self, events: list[pygame.event.Event]):
-        if not self.manager.object_manager.objects:
-            self.manager.switch_mode('home')
+        if not self.manager.object_manager.player.alive:
+            # print(self.name)
+            # self.reset()
+            Globals.set(RETRY_MESSAGE, 'You are such a noob!')
+            self.manager.transition_manager.set_transition('square')
+            self.manager.switch_mode('retry', reset=True, transition=True)
+            self.manager.sound_manager.fade(500)
 
     def draw(self, surf: pygame.Surface):
         surf.fill(self.background)
+        surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
 class TriangleEnemyScene(Menu):
@@ -332,7 +341,7 @@ class MenuManager:
         }
         self.subtitle_manager.clear()
         self.object_manager.clear()
-        self.mode = 'point'  # initial mode
+        self.mode = 'line'  # initial mode
         self.menu = self.menus[self.mode]
         self.sound_manager.stop()
         self.menu.reset()
