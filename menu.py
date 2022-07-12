@@ -235,7 +235,7 @@ class PointEnemyScene(Menu):
         self.manager.object_manager.add(PointEnemy())
         # self.manager.object_manager.add(PointSpreadBullet(target_pos=(WIDTH // 2, 150)))
         self.manager.sound_manager.stop()
-        self.manager.sound_manager.play('points', start=45)
+        self.manager.sound_manager.play('points', start=0)
         self.theme_color = 'red'
 
     def update(self, events: list[pygame.event.Event]):
