@@ -152,12 +152,12 @@ class TransitionManager:
 
     def update(self, events: list[pygame.event.Event]):
         self.transition.update()
-        for e in events:
-            if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_p:
-                    self.transition.k *= -1
-                if e.key == pygame.K_r:
-                    self.transition.start()
+        # for e in events:
+        #     if e.type == pygame.KEYDOWN:
+        #         if e.key == pygame.K_p:
+        #             self.transition.k *= -1
+        #         if e.key == pygame.K_r:
+        #             self.transition.start()
 
     def draw(self, surf: pygame.Surface):
         self.transition.draw(surf)

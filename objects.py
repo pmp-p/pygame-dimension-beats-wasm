@@ -2,10 +2,13 @@ import random
 
 import pygame.event
 from utils import clamp, map_to_range, Timer
-from config import WIDTH, HEIGHT
+from config import WIDTH, HEIGHT, Globals
 from operator import attrgetter
 from math import sin, cos, radians, degrees, atan2
 from typing import Union
+from constants import *
+
+import json
 
 
 class BaseObject:
@@ -37,30 +40,58 @@ class Player(BaseObject):
         self.y = y
         self.size = 15
         self.z = 1
+        self.rect_list = []
+        self.surf = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        self.surf.fill('blue')
 
     @property
     def rect(self):
         return pygame.Rect(self.x - self.size // 2, self.y - self.size // 2, self.size, self.size)
 
     def update(self, events: list[pygame.event.Event]):
-        speed = 5
+        speed = 7
+        v = pygame.Vector2(0, 0)
         keys = pygame.key.get_pressed()
+        if keys[pygame.K_RSHIFT] or keys[pygame.K_LSHIFT]:
+            speed *= 3
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            self.x -= speed
+            v.x -= 1
+            # self.x -= speed
         if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            self.x += speed
+            v.x += 1
+            # self.x += speed
         if keys[pygame.K_UP] or keys[pygame.K_w]:
-            self.y -= speed
+            v.y -= 1
+            # self.y -= speed
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            self.y += speed
-
+            v.y += 1
+            # self.y += speed
+        if v.length() > 0:
+            v = v.normalize() * speed
+        else:
+            v *= speed
+        if v.length() != 0:
+            self.x += v.x
+            self.y += v.y
+            if len(self.rect_list) < 20:
+                self.rect_list.append([self.x, self.y, 255])
         offset = 5 + self.size // 2
 
         self.x = clamp(self.x, offset, WIDTH - offset)
         self.y = clamp(self.y, offset, HEIGHT - offset)
 
     def draw(self, surf: pygame.Surface):
-        pygame.draw.rect(surf, 'blue', self.rect)
+        rect = self.rect
+        self.rect_list = [i for i in self.rect_list if i[2] > 1]
+        for i in self.rect_list:
+            i[2] -= 35
+            i[2] = clamp(i[2], 0, 255)
+            color = [0, 0, i[2]]
+            self.surf.set_alpha(i[2])
+            # pygame.draw.rect(surf, '#00AAFF', (i[0], i[1], 10, 10))
+            # pygame.draw.rect(surf, color, (i[0] - self.size // 2, i[1] - self.size // 2, self.size, self.size))
+            surf.blit(self.surf, self.surf.get_rect(center=i[0:2]))
+        pygame.draw.rect(surf, 'blue', rect)
 
 
 class PointBullet(BaseObject):
@@ -175,7 +206,7 @@ class LineRay(BaseObject):
                                  (self.x + dx * WIDTH, self.y + dy * WIDTH), 3)
 
 
-class BulletEnemy(Enemy):
+class PointEnemy(Enemy):
     def __init__(self, x=WIDTH // 2, y=HEIGHT // 2):
         super().__init__()
         self.x = x
@@ -187,6 +218,64 @@ class BulletEnemy(Enemy):
         self.z = 1
         self.offset = 0
 
+        def get_all_range(step=0, offset=0):
+            return range(offset, 360 + offset, step)
+
+        def get_one_by_one_range_list(initial_time=0.0, dt=0.1, step=1, offset=0, vel=1):
+            _list = [[initial_time + dt * i, [i], vel] for i in get_all_range(step=step, offset=offset)]
+            # print(_list)
+            return _list
+
+        def get_ony_by_one_together_list1(initial_time=0.0, dt=0.1, step=1, offset=0, vel=1, directions=1):
+            # _list = [[initial_time + dt * i, [j for j in range(i, 360 + i, 360 // directions)], vel] for i in get_all_range(step=step, offset=offset)]
+            # return _list
+            _list = []
+            # for i in range()
+
+        def get_one_by_one_together_list(initial_time=0.0, dt=0.1, step=1, offset=1, vel=1, beats=1):
+            _list = []
+            for i in range(beats):
+                a = [initial_time + dt * i, get_all_range(step, offset * i), vel]
+                _list.append(a)
+            return _list
+
+        def get_range_list(initial_time=0.0, dt=0.1, step=0, offset=0, vel=1, beats=1):
+            _list = [[initial_time + dt * j, [i for i in get_all_range(step=step, offset=offset * j)], vel] for j in range(beats)]
+            return _list
+
+        self.launching_patterns = [
+            # [0.1, [225, 135, 45, -45]],
+            [0.1, get_all_range(90, 45)],
+            [2, get_all_range(90, 0)],
+            [3.7, get_all_range(90, 45)],
+            [5.3, get_all_range(90, 0)],
+            [7.5, get_all_range(90, 45)],
+            [9, get_all_range(90, 0)],
+            [11, get_all_range(90, 45)],
+            [13, get_all_range(90, 0)],
+
+            *get_one_by_one_range_list(14, dt=0.001, step=8, vel=3),
+            *get_range_list(15, dt=0.9, step=30, offset=5, vel=1, beats=8),
+            *get_range_list(22, dt=1, step=15, offset=5, vel=1, beats=7),
+            *get_range_list(29.5, dt=0.4, step=30, offset=0, vel=3, beats=1),
+            *get_one_by_one_range_list(30.5, dt=0.002, step=20, vel=2),
+            *get_range_list(32, dt=0.4, step=30, offset=0, vel=3, beats=1),
+            *get_one_by_one_range_list(32.5, dt=0.002, step=20, vel=2),
+            *get_range_list(33.5, dt=0.4, step=30, offset=0, vel=3, beats=1),
+            *get_one_by_one_range_list(34.5, dt=0.002, step=20, vel=2),
+            *get_range_list(35, dt=0.4, step=30, offset=10, vel=3, beats=6),
+
+            *get_range_list(35.5, dt=1, step=45, offset=25, vel=3, beats=9),
+
+            # *get_ony_by_one_together_list(44, dt=0.01, step=10, offset=10, vel=1, directions=5),
+            *get_one_by_one_together_list(44, dt=0.1, step=45, offset=5, vel=2, beats=60),
+
+            *get_one_by_one_together_list(51.5, dt=0.1, step=45, offset=-5, vel=2, beats=60),
+        ]
+        self.current_timestamp = 0
+
+        # self.object_launchers
+
     def use_ai(self, player: 'Player'):
         super().use_ai(player)
         if self.phase_timer.tick:
@@ -195,20 +284,59 @@ class BulletEnemy(Enemy):
         if self.phase >= 6:
             if self.alive:
                 self.alive = False
-                # self.object_manager.add(
-                #     LineEnemy(self.x, self.y)
-                # )
             return
+        # self.phase = 0
         if self.phase % 2 == 0:
             self.phase_timer.timeout = 5
             if self.phase == 0:
-                if self.bullet_timer.tick:
-                    for i in range(0, 360, 30):
-                        dx = cos(radians(i))
-                        dy = sin(radians(i))
-                        _bullets.append(
-                            PointBullet(self.x, self.y, dx, dy)
-                        )
+                try:
+                    if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > self.launching_patterns[self.current_timestamp][0]:
+                        if self.launching_patterns[self.current_timestamp][1] == 'all':
+                            for i in range(0, 360, 30):
+                                dx = cos(radians(i))
+                                dy = sin(radians(i))
+                                try:
+                                    v = self.launching_patterns[self.current_timestamp][2]
+                                    dx *= v
+                                    dy *= v
+                                except IndexError:
+                                    pass
+                                _bullets.append(
+                                    PointBullet(self.x, self.y, dx, dy)
+                                )
+                        else:
+                            for i in self.launching_patterns[self.current_timestamp][1]:
+                                dx = cos(radians(i))
+                                dy = sin(radians(i))
+                                try:
+                                    v = self.launching_patterns[self.current_timestamp][2]
+                                    dx *= v
+                                    dy *= v
+                                except IndexError:
+                                    pass
+                                _bullets.append(
+                                    PointBullet(self.x, self.y, dx, dy)
+                                )
+                        self.current_timestamp += 1
+                        _c = 0
+                        print(Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK))
+                        for i in self.launching_patterns:
+                            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > i[0]:
+                                continue
+                            else:
+                                _c = self.launching_patterns.index(i)
+                                break
+                        self.current_timestamp = _c
+                except IndexError:
+                    pass
+
+                # if self.bullet_timer.tick:
+                #     for i in range(0, 360, 30):
+                #         dx = cos(radians(i))
+                #         dy = sin(radians(i))
+                #         _bullets.append(
+                #             PointBullet(self.x, self.y, dx, dy)
+                #         )
             elif self.phase == 2:
                 if self.bullet_timer.tick:
                     for i in range(0, 360, 15):
@@ -282,6 +410,10 @@ class LineEnemy(Enemy):
         pygame.draw.circle(surf, 'red', (self.x, self.y), self.r, 2)
 
 
+class QuadrilateralEnemy(Enemy):
+    pass
+
+
 class PointClicked(BaseObject):
     def __init__(self, x, y, initial_r=0):
         super().__init__()
@@ -305,18 +437,17 @@ class PointClicked(BaseObject):
 
 
 class TriangleBullet(BaseObject):
-    ANGULAR_VEL = 20
-    VEL = 20
     COLOUR = "RED"
     BORDER_COLOUR = "WHITE"
     SIDE_LENGTH = 10
     BORDER_WIDTH = 2
 
-    def __init__(self, c_pos):
+    def __init__(self, c_pos, enemy_dir, vel, angular_vel):
         super().__init__()
         self.c_pos = c_pos
-        self._dir = c_pos.rotate(90)
-        print(177)
+        self._dir = enemy_dir.rotate(90)
+        self.vel = vel
+        self.angular_vel = angular_vel
         self.vers = []
         self.generate_vertices()
 
@@ -332,41 +463,42 @@ class TriangleBullet(BaseObject):
             vec2.rotate(240),
         ]
 
-    def update(self, dt=0.16):
-        print(194)
+    def update(self, events: list[pygame.event.Event]):
         for vec in self.vers:
-            vec.rotate_ip(self.ANGULAR_VEL * dt)
-            vec.xy += self._dir * (self.VEL * dt)
+            vec.rotate_ip(self.angular_vel)
+            vec.xy += self._dir * self.vel
 
     def draw(self, surf: pygame.Surface):
-        pygame.draw.polygon(surf, self.COLOUR, (self.vers[:3]))
-        pygame.draw.polygon(surf, self.BORDER_COLOUR, (self.vers[3:]))
+        pygame.draw.polygon(surf, self.BORDER_COLOUR, [self.c_pos + vec for vec in self.vers[3:]])
+        pygame.draw.polygon(surf, self.COLOUR, [self.c_pos + vec for vec in self.vers[:3]])
 
 
 class TriangleEnemy(Enemy):
-    ANGULAR_VEL = 20
+    ANGULAR_VEL = 5
+    VEL = 5
     COLOUR = "RED"
     BORDER_COLOUR = "WHITE"
-    SIDE_LENGTH = 50
+    SIDE_LENGTH = 40
     BORDER_WIDTH = 5
 
-    def __init__(self, c_pos=(WIDTH // 2, HEIGHT // 2)):
+    def __init__(self):
         super().__init__()
-        self.c_pos = pygame.Vector2(c_pos)
-        self.a = False
-        self.current_ver = 0
-
+        self.path_vers = []
+        self.screen_centre = pygame.Vector2(WIDTH // 2, HEIGHT // 2)
+        self.c_pos = pygame.Vector2(self.screen_centre)
         self.phase = 0
         self.phase_timer = Timer(10)
         self.bullet_timer = Timer(0.5)
-        self.vers = []
-        self.generate_vertices()
-        # self.vers = []
+        self.vers = self.generate_vertices(self.SIDE_LENGTH, self.BORDER_WIDTH)
+        self.launched_triangles = []
+        self.path_target = 0
+        self.max_bullets = 20
 
-    def generate_vertices(self):
-        vec1 = pygame.Vector2(0, -self.SIDE_LENGTH)
-        vec2 = pygame.Vector2(0, -self.SIDE_LENGTH - self.BORDER_WIDTH)
-        self.vers = [
+    @staticmethod
+    def generate_vertices(side_length, border_width):
+        vec1 = pygame.Vector2(0, -side_length)
+        vec2 = pygame.Vector2(0, -side_length - border_width)
+        vers = [
             vec1,
             vec1.rotate(120),
             vec1.rotate(240),
@@ -374,22 +506,57 @@ class TriangleEnemy(Enemy):
             vec2.rotate(120),
             vec2.rotate(240),
         ]
+        return vers
 
-    def update(self, dt=0.16):
+    def use_ai(self, player: 'Player'):
+        super().use_ai(player)
         for vec in self.vers:
-            vec.rotate_ip(self.ANGULAR_VEL * dt)
+            vec.rotate_ip(self.ANGULAR_VEL)
+
+        if self.phase_timer.tick:
+            self.phase += 1
+            if self.phase > 2:
+                self.phase = 0
+            if self.phase == 2:
+                self.path_vers = self.generate_vertices(200, 0)[:3]
+                self.max_bullets = 1000
+            else:
+                self.max_bullets = 20
+                self.c_pos = pygame.Vector2(self.screen_centre)
+
+            for bullets in self.launched_triangles:
+                bullets.alive = False
+            self.launched_triangles = []
 
         if self.bullet_timer.tick:
-            self.object_manager.add(
-                TriangleBullet(self.vers[self.current_ver])
-            )
-            self.current_ver += 1
-            if self.current_ver == 3:
-                self.current_ver = 0
+            if len(self.launched_triangles) < self.max_bullets:
+                for vec in self.vers[:3]:
+                    if self.phase == 0:
+                        temp = TriangleBullet(self.c_pos + vec, vec, 0.3, 2)
+                    elif self.phase == 1:
+                        temp = TriangleBullet(self.c_pos + vec, vec, 0.3, 5)
+                    elif self.phase == 2:
+                        temp = TriangleBullet(self.c_pos + vec, vec, 0.3, 0)
+                    else:
+                        temp = TriangleBullet(self.c_pos + vec, vec, 0.3, 0)
+                    self.object_manager.add(
+                        temp
+                    )
+                    self.launched_triangles.append(temp)
+
+        if self.phase == 2:
+            self.c_pos.move_towards_ip(self.screen_centre + self.path_vers[self.path_target], self.VEL)
+            if self.c_pos == self.screen_centre + self.path_vers[self.path_target]:
+                self.path_target += 1
+                if self.path_target > 2:
+                    self.path_target = 0
+
+    def update(self, events: list[pygame.event.Event]):
+        pass
 
     def draw(self, surf: pygame.Surface):
-        pygame.draw.polygon(surf, self.COLOUR, (self.vers[:3]))
-        pygame.draw.polygon(surf, self.BORDER_COLOUR, (self.vers[3:]))
+        pygame.draw.polygon(surf, self.BORDER_COLOUR, [self.c_pos + vec for vec in self.vers[3:]])
+        pygame.draw.polygon(surf, self.COLOUR, [self.c_pos + vec for vec in self.vers[:3]])
 
 
 # TODO
@@ -445,8 +612,9 @@ class ObjectManager:
         # print(self.get_object_count(Player))
         for i in self.objects:
             # i.update(events)
-            if i.check_collision(self.player):
-                self.player.alive = False
+            # TODO collisions
+            # if i.check_collision(self.player):
+            #     self.player.alive = False
             if isinstance(i, Enemy):
                 i.use_ai(self.player)
             else:
@@ -455,7 +623,7 @@ class ObjectManager:
             self.player.update(events)
 
     def draw(self, surf: pygame.Surface):
-        if self.player:
-            self.player.draw(surf)
         for i in self.objects:
             i.draw(surf)
+        if self.player:
+            self.player.draw(surf)

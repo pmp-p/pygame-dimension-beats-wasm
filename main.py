@@ -28,6 +28,8 @@ Globals.set(FULL_PLAYED, False)
 Globals.set(RETRY_MESSAGE, '')
 Globals.set(CURRENT_LEVEL, '')
 Globals.set(MUSIC_INIT, music_init)
+Globals.set(SOUND_VALUE, 0)
+Globals.set(ELAPSED_TIME_FOR_SOUNDTRACK, 0)
 
 
 # TODO add subtitle manager

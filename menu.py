@@ -182,7 +182,7 @@ class Retry(Menu):
         # )
         for i in get_typed_subtitles(message, _time='inf', pos=(WIDTH // 2, 150), callback=lambda: Globals.set(RETRY_MESSAGE, '')):
             self.manager.subtitle_manager.add(i)
-        self.input_enabled = False
+        self.input_enabled = True
         self.message = 'Retry ?'
         self.options = ['Yes', 'No']
 
@@ -232,9 +232,10 @@ class PointEnemyScene(Menu):
     def __init__(self, manager: 'MenuManager', name='menu'):
         super().__init__(manager, name)
         self.manager.object_manager.init()
-        self.manager.object_manager.add(BulletEnemy())
+        self.manager.object_manager.add(PointEnemy())
         self.manager.sound_manager.stop()
-        self.manager.sound_manager.play('points')
+        self.manager.sound_manager.play('points', start=0)
+        self.theme_color = 'red'
 
     def update(self, events: list[pygame.event.Event]):
         if not self.manager.object_manager.player.alive:
@@ -249,6 +250,16 @@ class PointEnemyScene(Menu):
 
     def draw(self, surf: pygame.Surface):
         surf.fill(self.background)
+        length = 400
+        total_time = self.manager.sound_manager.total_length
+        try:
+            t = self.manager.sound_manager.elapsed_time
+            t = map_to_range(t, 0, total_time, 0, length)
+            pygame.draw.rect(surf, '#00AAFF', (WIDTH // 2 - length // 2, 20, t, 10))
+            pygame.draw.rect(surf, '#FFFFFF', (WIDTH // 2 - length // 2, 20, length, 10), 2)
+        except ZeroDivisionError:
+            pass
+        surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
 class LineEnemyScene(Menu):
@@ -280,6 +291,20 @@ class TriangleEnemyScene(Menu):
         surf.fill(self.background)
 
 
+class QuadrilateralEnemyScene(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        self.manager.object_manager.init()
+        self.manager.object_manager.add(LineEnemy())
+
+    def update(self, events: list[pygame.event.Event]):
+        if not self.manager.object_manager.objects:
+            self.manager.switch_mode('home')
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(self.background)
+
+
 class MenuManager:
     # TODO implement StackBasedGameLoop
 
@@ -306,10 +331,10 @@ class MenuManager:
         }
         self.subtitle_manager.clear()
         self.object_manager.clear()
-        self.mode = 'triangle'  # initial mode
+        self.mode = 'point'  # initial mode
         self.menu = self.menus[self.mode]
-        self.menu.reset()
         self.sound_manager.stop()
+        self.menu.reset()
 
     def reset(self):
         self.__init__()
@@ -335,6 +360,17 @@ class MenuManager:
                     self.object_manager.add(
                         PointClicked(*pygame.mouse.get_pos())
                     )
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_SPACE:
+                    self.sound_manager.toggle_pause()
+                if e.key == pygame.K_r:
+                    self.menu.reset()
+                if e.key == pygame.K_KP_PLUS:
+                    self.sound_manager.skip_to(self.sound_manager.elapsed_time + 1)
+                if e.key == pygame.K_KP_MINUS:
+                    self.sound_manager.skip_to(self.sound_manager.elapsed_time - 1)
+                    # self.sound_manager.reset()
+        # print(self.sound_manager.elapsed_time)
         if self.to_switch != 'none':
             if self.transition_manager.transition.status == 'closed':
                 self.switch_mode(self.to_switch, self.to_reset, transition=False)
@@ -351,4 +387,6 @@ class MenuManager:
         self.object_manager.draw(surf)
         self.transition_manager.draw(surf)
         self.subtitle_manager.draw(surf)
+        self.sound_manager.update_time()
+        # surf.blit(text(Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK).__str__(), color='white'), (0, 150))
         # surf.blit(text(self.transition_manager.transition.status, color='black'), (0, 0))

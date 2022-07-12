@@ -14,6 +14,8 @@ import pygame
 WIDTH = int(800 * 1.0)  # width of the screen
 HEIGHT = int(600 * 1.0)  # height of the screen
 
+print(WIDTH, HEIGHT)
+
 VOLUME = 100  # sound volume
 
 FPS = 60

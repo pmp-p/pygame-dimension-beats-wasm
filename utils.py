@@ -56,6 +56,17 @@ def text(msg: str, size=50, color=(255, 255, 255), aliased=False):
     return font(size).render(msg, aliased, color)
 
 
+def dilute(color: tuple[int, int, int], factor):
+    r, g, b = color
+    r //= factor
+    g //= factor
+    b //= factor
+    r = clamp(r, 0, 255)
+    g = clamp(g, 0, 255)
+    b = clamp(b, 0, 255)
+    return r, g, b
+
+
 class Timer:
     def __init__(self, timeout=0.0, callback=None):
         self.timeout = timeout
@@ -98,7 +109,7 @@ class TimerSequence:
         # timestamps -> list [ list [ str (name), float (time), callback[optional] ] ]
         self.timestamps = timestamps
         self.current = timestamps.pop(0)
-        self.current_timer = Timer(self.current[1])
+        self.current_timer = Timer(self.current[1], callback=self.current[2] if self.current[2] else None)
 
     def update(self):
         if self.current and self.current_timer:
