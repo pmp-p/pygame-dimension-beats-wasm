@@ -132,6 +132,10 @@ class SoundManager:
             'ping': 'ping.ogg',
         }
         self.current = ''
+        self.sound_durations = {
+            'points': 153,
+            'lines': 103,
+        }
         for i in self.config.keys():
             self.config[i] = os.path.abspath(os.path.join(ASSETS, 'sounds', self.config[i]))
         init = Globals.get(MUSIC_INIT)
@@ -202,6 +206,8 @@ class SoundManager:
         # for playing a bgm track
         self.current_sound = sound
         pygame.mixer.music.load(os.path.join(ASSETS, 'sounds', f'{sound}.ogg'))
+        duration = self.sound_durations.get(sound)
+        Globals.set(TOTAL_DURATION_OF_SOUNDTRACK, duration if duration else 0)
         pygame.mixer.music.play(start=start)
         self._time = time.time()
         self._time -= start
@@ -218,7 +224,7 @@ class SoundManager:
 
     @property
     def total_length(self):
-        return 100
+        return Globals.get(TOTAL_DURATION_OF_SOUNDTRACK)
 
     @property
     def elapsed_time(self):

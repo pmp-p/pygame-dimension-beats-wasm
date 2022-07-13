@@ -97,7 +97,7 @@ class Player(BaseObject):
 
 
 class PointBullet(BaseObject):
-    def __init__(self, x=WIDTH // 2, y=HEIGHT // 2, dx=1.0, dy=1.0, r=5):
+    def __init__(self, x=WIDTH // 2, y=HEIGHT // 2, dx=1.0, dy=1.0, r=5, color='red'):
         super().__init__()
         self.x = x
         self.y = y
@@ -105,6 +105,7 @@ class PointBullet(BaseObject):
         self.dy = dy
         self.speed = 2
         self.r = r
+        self.color = color
 
     @property
     def rect(self):
@@ -122,7 +123,7 @@ class PointBullet(BaseObject):
 
     def draw(self, surf: pygame.Surface):
         pygame.draw.circle(surf, 'white', (self.x, self.y), self.r)
-        pygame.draw.circle(surf, 'red', (self.x, self.y), self.r, 2 if self.r > 3 else 1)
+        pygame.draw.circle(surf, self.color, (self.x, self.y), self.r, 2 if self.r > 3 else 1)
 
 
 class PointSpreadBullet(BaseObject):
@@ -169,13 +170,101 @@ class LineBullet(BaseObject):
         self.timer = Timer(1)
 
     def update(self, events: list[pygame.event.Event]):
-        # self.x += self.dx * self.speed
-        # self.y += self.dy * self.speed
+        # if self.move:
+        #     self.x += self.dx * self.speed
+        #     self.y += self.dy * self.speed
         if self.timer.tick:
             self.alive = False
 
     def draw(self, surf: pygame.Surface):
         pygame.draw.line(surf, 'white', (self.x, self.y), (self.x + self.length * self.dx, self.y + self.length * self.dy))
+
+
+class LineBullet1(BaseObject):
+    def __init__(self, x=WIDTH // 2, y=HEIGHT // 2, dx=1.0, dy=1.0, length=10, speed=1):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.speed = speed
+        self.dx = dx
+        self.dy = dy
+        self.length = length
+        # self.timer = Timer(10)
+
+    @property
+    def points(self):
+        return (self.x, self.y), (self.x + self.length * self.dx, self.y + self.length * self.dy)
+
+    def check_collision(self, player: 'Player'):
+        return player.rect.clipline(*self.points)
+
+    def update(self, events: list[pygame.event.Event]):
+        self.x += self.dx * self.speed
+        self.y += self.dy * self.speed
+        # if self.timer.tick:
+        #     self.alive = Falsed
+        if not pygame.Rect(0, 0, WIDTH, HEIGHT).inflate(50, 50).collidepoint(self.x, self.y):
+            self.alive = False
+
+    def draw(self, surf: pygame.Surface):
+        points = self.points
+        pygame.draw.line(surf, 'blue', points[0], points[1], 5)
+        pygame.draw.line(surf, 'white', points[0], points[1], 2)
+
+
+class LineBullet2(BaseObject):
+    VEL = 0.1
+    LENGTH = 50
+    COLOUR = "RED"
+    BORDER_COLOUR = "WHITE"
+
+    def __init__(self, c_pos, _dir):
+        super().__init__()
+        self.c_pos = c_pos
+        self._dir = _dir
+        self.pos1 = pygame.Vector2(self.c_pos)
+        self.pos2 = self.c_pos + self._dir * self.LENGTH
+
+    def update(self, events: list[pygame.event.Event]):
+        self.pos1 += self._dir * self.VEL
+        self.pos2 += self._dir * self.VEL
+
+    def draw(self, surf: pygame.Surface):
+        pygame.draw.line(surf, self.COLOUR, self.pos1, self.pos2, width=4)
+        pygame.draw.circle(surf, self.BORDER_COLOUR, self.pos2, 10)
+        pygame.draw.circle(surf, self.COLOUR, self.pos2, 8)
+
+
+class LineSpreadBullet(BaseObject):
+    def __init__(self, pos=(WIDTH // 2, HEIGHT // 2), target_pos=(WIDTH // 2, HEIGHT // 2)):
+        super().__init__()
+        self.pos = pygame.Vector2(pos)
+        self.target_pos = pygame.Vector2(target_pos)
+
+    def update(self, events: list[pygame.event.Event]):
+        _dx = (self.target_pos - self.pos)
+        # self.pos += dx / 20
+        if _dx.length() < 3:
+            self.pos = self.target_pos
+        else:
+            self.pos += _dx / 20
+        if self.pos == self.target_pos:
+            _bullets = []
+            speed = 3
+            offset = random.randint(-15, 15)
+            for i in range(offset, 360 + offset, 30):
+                dx = cos(radians(i)) * speed
+                dy = sin(radians(i)) * speed
+                _bullets.append(LineBullet1(self.pos.x, self.pos.y, dx, dy, speed=3))
+            self.object_manager.add_multiple(_bullets)
+            self.alive = False
+
+    def draw(self, surf: pygame.Surface):
+        color = random.choice(['white', 'blue'])
+        try:
+            pygame.draw.line(surf, color, self.pos, self.pos + (self.target_pos - self.pos).normalize() * 10, 2)
+        except ValueError:
+            pygame.draw.circle(surf, color, self.pos, 1)
 
 
 class LineRay(BaseObject):
@@ -255,18 +344,18 @@ class PointEnemy(Enemy):
         def get_all_range(step=0, offset=0):
             return range(offset, 360 + offset, step)
 
-        def get_one_by_one_range_list(initial_time=0.0, dt=0.1, step=1, offset=0, vel=1):
+        def get_one_by_one_range_list(initial_time=0.0, dt=0.1, step=1, offset=0, vel=1.0):
             _list = [[initial_time + dt * i, [i], vel] for i in get_all_range(step=step, offset=offset)]
             return _list
 
-        def get_one_by_one_together_list(initial_time=0.0, dt=0.1, step=1, offset=1, vel=1, beats=1):
+        def get_one_by_one_together_list(initial_time=0.0, dt=0.1, step=1, offset=1, vel=1.0, beats=1):
             _list = []
             for i in range(beats):
                 a = [initial_time + dt * i, get_all_range(step, offset * i), vel]
                 _list.append(a)
             return _list
 
-        def get_range_list(initial_time=0.0, dt=0.1, step=0, offset=0, vel=1, beats=1):
+        def get_range_list(initial_time=0.0, dt=0.1, step=0, offset=0, vel=1.0, beats=1):
             _list = [[initial_time + dt * j, [i for i in get_all_range(step=step, offset=offset * j)], vel] for j in range(beats)]
             return _list
 
@@ -299,6 +388,40 @@ class PointEnemy(Enemy):
 
             *get_one_by_one_together_list(51.5, dt=0.1, step=45, offset=-5, vel=3, beats=60),
 
+            [88, 'move'],
+
+            *get_range_list(88, dt=1, step=90, offset=25, vel=2, beats=8),
+
+            [96, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(97, dt=0.002, step=360 // 10, offset=5, vel=3),
+
+            [97.75, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(98.75, dt=0.002, step=360 // 10, offset=5, vel=3.25),
+
+            [99.5, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(100.5, dt=0.002, step=360 // 10, offset=5, vel=3.5),
+
+            [101.25, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(102.25, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            # *get_one_by_one_range_list(112, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            *get_range_list(118, 0.9, 30, 10, vel=3, beats=9),
+            *get_one_by_one_range_list(126.5, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            [127.5, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(128.25, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            [129.5, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(130.25, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            [131.5, get_all_range(30, 10), 3],
+            *get_one_by_one_range_list(132.25, dt=0.002, step=360 // 10, offset=5, vel=4),
+
+            *get_range_list(initial_time=133.5, dt=1.75, step=30, offset=10, vel=5, beats=8),
+
+            *get_range_list(147, 1, 45, 15, 3, 5),
+
             [1000, 'all'],
             [1000, 'all'],
             # [1000, 'all'],
@@ -327,70 +450,115 @@ class PointEnemy(Enemy):
         ]
         self.current_timestamp = 0
 
-        # def get_enemies_list(_time=0.0, r=WIDTH / 4):
+        def get_enemies_list(_time=0.0, _dt=0.0, _type='a', beats=1):
+            if _type == 'a':
+                return [[
+                    _time + i * _dt,
+                    PointSpreadBullet,
+                    [self.pos, self.pos, self.pos, self.pos],
+                    [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
+                ] for i in range(beats)]
+            elif _type == 'b':
+                return [[
+                    _time + i * _dt,
+                    PointSpreadBullet,
+                    [self.pos, self.pos, self.pos, self.pos],
+                    [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                ] for i in range(beats)]
+            elif _type == 'c':
+                return [[
+                    _time + i * _dt,
+                    PointSpreadBullet,
+                    [self.pos] * 8,
+                    [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4),
+                     (WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                ] for i in range(beats)]
+            else:
+                return []
+
+        def get_enemy_list_beats(initial_time=0.0, dt=0.002, _type='bottom', count=2):
+            if _type == 'top':
+                return [
+                    [
+                        initial_time + i * dt,
+                        PointSpreadBullet,
+                        [self.pos],
+                        [(WIDTH * (i + 1) / (count + 1), 50)]
+                    ] for i in range(count)
+                ]
+            elif _type == 'bottom':
+                return [
+                    [
+                        initial_time + i * dt,
+                        PointSpreadBullet,
+                        [self.pos],
+                        [(WIDTH * (i + 1) / (count + 1), HEIGHT - 25)]
+                    ] for i in range(count)
+                ]
+            elif _type == 'left':
+                return [
+                    [
+                        initial_time + i * dt,
+                        PointSpreadBullet,
+                        [self.pos],
+                        [(25, HEIGHT * (i + 1) / (count + 1))]
+                    ] for i in range(count)
+                ]
+            elif _type == 'right':
+                return [
+                    [
+                        initial_time + i * dt,
+                        PointSpreadBullet,
+                        [self.pos],
+                        [(WIDTH - 25, HEIGHT * (i + 1) / (count + 1))]
+                    ] for i in range(count)
+                ]
+            else:
+                return []
 
         self.enemy_launch_patterns = [
             # [timestamp, enemy_type, [pos_list], [target_pos_list]]
-            # [59, PointSpreadBullet, [self.pos, self.pos, self.pos, self.pos], [(0, 0), (WIDTH, 0), (WIDTH, HEIGHT), (0, HEIGHT)]],
-            [
-                59,
-                PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
-            ],
-            [
-                60.9,
-                PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
-            ],
-            [
-                62.8,
-                PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
-            ],
-            [
-                64.7,
-                PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
-            ],
+            *get_enemies_list(59, _dt=1.8, _type='a', beats=4),
+            *get_enemies_list(59 + 1.8 * 4 + 0.1, _dt=1.8, _type='b', beats=4),
+            *get_enemies_list(74, _dt=1.8, _type='c', beats=8),
 
             [
-                66.6,
+                103,
                 PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                [self.pos] * 3,
+                [(WIDTH / 4, HEIGHT / 4), (WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4)]
             ],
             [
-                68.5,
+                105,
                 PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                [self.pos] * 3,
+                [(WIDTH / 4, HEIGHT * 3 / 4), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4)]
             ],
             [
-                70.4,
+                107,
                 PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                [self.pos] * 3,
+                [(WIDTH / 4, HEIGHT / 4), (WIDTH / 4, HEIGHT / 2), (WIDTH / 4, HEIGHT * 3 / 4)]
             ],
             [
-                72.3,
+                109,
                 PointSpreadBullet,
-                [self.pos, self.pos, self.pos, self.pos],
-                [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2)]
+                [self.pos] * 3,
+                [(WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH * 3 / 4, HEIGHT * 3 / 4)]
             ],
 
-            [
-                75,
-                PointSpreadBullet,
-                [self.pos] * 8,
-                [(WIDTH / 2, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 2), (WIDTH / 2, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT / 2),
-                 (WIDTH / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT / 4), (WIDTH * 3 / 4, HEIGHT * 3 / 4), (WIDTH / 4, HEIGHT * 3 / 4)]
-            ],
+            *get_enemy_list_beats(112, dt=0.1, _type='top', count=7),
+
+            *get_enemy_list_beats(113.7, dt=0.1, _type='bottom', count=7),
+
+            *get_enemy_list_beats(115.4, dt=0.1, _type='left', count=7),
+
+            *get_enemy_list_beats(117.1, dt=0.1, _type='right', count=7),
         ]
         self.current_enemy_timestamp = 0
+
+        self.k = 0
+        self.k1 = 0
 
     @property
     def pos(self):
@@ -399,13 +567,19 @@ class PointEnemy(Enemy):
     def use_ai(self, player: 'Player'):
         super().use_ai(player)
         self.r *= 0.95
-        # self.x += math.sin(time.time() * 1) * 1
-        # self.y += math.cos(time.time() * 1) * 1
+        self.x += math.sin(time.time() * self.k) * self.k1
+        self.y += math.cos(time.time() * self.k) * self.k1
         self.r = clamp(self.r, 10, 20)
         # if self.phase_timer.tick:
         #     self.phase += 1
         _bullets = []
         _enemies = []
+        # try:
+        #     if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+        #         print(Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK), Globals.get(TOTAL_DURATION_OF_SOUNDTRACK), 'yooooooooooo')
+        #         self.alive = False
+        # except TypeError:
+        #     pass
         try:
             if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > self.launching_patterns[self.current_timestamp][0]:
                 if self.launching_patterns[self.current_timestamp][1] == 'all':
@@ -422,18 +596,22 @@ class PointEnemy(Enemy):
                             PointBullet(self.x, self.y, dx, dy)
                         )
                 else:
-                    for i in self.launching_patterns[self.current_timestamp][1]:
-                        dx = cos(radians(i))
-                        dy = sin(radians(i))
-                        try:
-                            v = self.launching_patterns[self.current_timestamp][2]
-                            dx *= v
-                            dy *= v
-                        except IndexError:
-                            pass
-                        _bullets.append(
-                            PointBullet(self.x, self.y, dx, dy)
-                        )
+                    if self.launching_patterns[self.current_timestamp][1] == 'move':
+                        self.k = 5
+                        self.k1 = 2
+                    else:
+                        for i in self.launching_patterns[self.current_timestamp][1]:
+                            dx = cos(radians(i))
+                            dy = sin(radians(i))
+                            try:
+                                v = self.launching_patterns[self.current_timestamp][2]
+                                dx *= v
+                                dy *= v
+                            except IndexError:
+                                pass
+                            _bullets.append(
+                                PointBullet(self.x, self.y, dx, dy)
+                            )
                 self.current_timestamp += 1
                 _c = 0
                 # print(Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK))
@@ -454,7 +632,7 @@ class PointEnemy(Enemy):
             self.object_manager.add_multiple(_bullets)
             self.r = 20
 
-        print(self.current_enemy_timestamp)
+        # print(self.current_enemy_timestamp)
         try:
             curr = self.enemy_launch_patterns[self.current_enemy_timestamp]
             if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > curr[0]:
@@ -501,11 +679,149 @@ class LineEnemy(Enemy):
         self.z = 1
         self.offset = 0
 
+        self.k = 0
+        self.k1 = 0
+
+        def get_one_by_one(initial_time=0.0, dt=1.0, offset=1, vel=3, beats=1, _type=LineBullet1, initial_offset=0):
+            # _offset = random.randint(-10, 10)
+            _offset = initial_offset
+            return [
+                [initial_time + i * dt, _type, [_offset + (i * offset) % 360], vel] for i in range(beats)
+            ]
+
+        def get_range_one_by_one(initial_time=0.0, dt=1.0, step=1, offset=1, vel=3, beats=1, _type=LineBullet1):
+            return [
+                [initial_time + i * dt, _type, range(offset * i, 360 + offset * i, step), vel] for i in range(beats)
+            ]
+
+        self.launching_patterns = [
+            # [1, LineBullet1, [10, 20, 30], 3],
+            *get_one_by_one(0, 0.4, offset=20, vel=5, beats=15),
+            *get_one_by_one(6, 0.05, offset=20, vel=5, beats=19),
+            *get_one_by_one(7, 0.4, offset=20, vel=5, beats=15),
+            *get_one_by_one(13, 0.05, offset=20, vel=5, beats=19),
+
+            *get_range_one_by_one(13, 0.4, step=30, offset=10, vel=5, beats=17),
+
+            *get_one_by_one(19.5, 0.05, offset=20, vel=5, beats=19),
+
+            *get_range_one_by_one(17, 0.4, step=30, offset=10, vel=5, beats=24),
+
+            *get_one_by_one(26.5, 0.05, offset=20, vel=5, beats=19),
+
+            *get_range_one_by_one(34, 0.4, step=30, offset=10, vel=5, beats=5),
+
+            *get_one_by_one(36, 0.025, offset=20, vel=5, beats=10, initial_offset=0),
+            *get_one_by_one(37.5, 0.025, offset=20, vel=5, beats=10, initial_offset=180),
+
+            *get_one_by_one(42.5, 0.025, offset=20, vel=5, beats=10, initial_offset=0),
+            *get_one_by_one(44.5, 0.025, offset=20, vel=5, beats=10, initial_offset=180),
+
+            [47.75, None, 'line_ray'],
+            [48, None, 'line_ray'],
+            [49, None, 'line_ray'],
+
+            *get_one_by_one(49.5, 0.025, offset=20, vel=5, beats=10, initial_offset=0),
+
+            [51, None, 'line_ray'],
+
+            *get_one_by_one(51.0, 0.025, offset=20, vel=5, beats=10, initial_offset=180),
+
+            [52.5, None, 'line_ray'],
+
+            *get_range_one_by_one(55, 0.4, step=30, offset=10, vel=5, beats=15),
+
+            [61.5, None, 'line_ray'],
+            [63.5, None, 'line_ray'],
+            [65, None, 'line_ray'],
+            [66.75, None, 'line_ray'],
+
+            *get_range_one_by_one(68.5, 0.4, step=30, offset=10, vel=5, beats=4),
+
+            *get_range_one_by_one(95.9, 0.425, step=45, offset=10, vel=5, beats=15),
+            *get_range_one_by_one(102.3, 0.425, step=15, offset=10, vel=5, beats=1),
+        ]
+
+        # self.launching_patterns.clear()
+
+        def get_enemy_list_beats(initial_time=0.0, dt=0.002, _type='bottom', count=2):
+            if _type == 'top':
+                return [
+                    [
+                        initial_time + i * dt,
+                        LineSpreadBullet,
+                        [self.pos],
+                        [(WIDTH * (i + 1) / (count + 1), 50)]
+                    ] for i in range(count)
+                ]
+            elif _type == 'bottom':
+                return [
+                    [
+                        initial_time + i * dt,
+                        LineSpreadBullet,
+                        [self.pos],
+                        [(WIDTH * (i + 1) / (count + 1), HEIGHT - 25)]
+                    ] for i in range(count)
+                ]
+            elif _type == 'left':
+                return [
+                    [
+                        initial_time + i * dt,
+                        LineSpreadBullet,
+                        [self.pos],
+                        [(25, HEIGHT * (i + 1) / (count + 1))]
+                    ] for i in range(count)
+                ]
+            elif _type == 'right':
+                return [
+                    [
+                        initial_time + i * dt,
+                        LineSpreadBullet,
+                        [self.pos],
+                        [(WIDTH - 25, HEIGHT * (i + 1) / (count + 1))]
+                    ] for i in range(count)
+                ]
+            else:
+                return []
+
+        self.enemy_launch_patterns = [
+            [27.5, LineSpreadBullet, [self.pos], [(150, 150)]],
+            [29, LineSpreadBullet, [self.pos], [(WIDTH - 150, 150)]],
+
+            *get_enemy_list_beats(31, dt=0.1, _type='top', count=5),
+            # *get_enemy_list_beats(33, dt=0.1, _type='bottom', count=5),
+            # *get_enemy_list_beats(35, dt=0.1, _type='left', count=5),
+            *get_enemy_list_beats(38, dt=0.1, _type='bottom', count=5),
+
+            *get_enemy_list_beats(40, dt=0.1, _type='left', count=5),
+            *get_enemy_list_beats(42, dt=0.1, _type='right', count=5),
+
+            *get_enemy_list_beats(43.5, dt=0.1, _type='top', count=2),
+            *get_enemy_list_beats(44.5, dt=0.1, _type='bottom', count=2),
+
+            *get_enemy_list_beats(69.5, dt=0.1, _type='bottom', count=2),
+            *get_enemy_list_beats(71, dt=0.4, _type='top', count=7),
+
+            *get_enemy_list_beats(74, dt=0.4, _type='bottom', count=7),
+
+            *get_enemy_list_beats(77, dt=0.4, _type='left', count=7),
+
+            *get_enemy_list_beats(80, dt=0.4, _type='right', count=7),
+
+            *get_enemy_list_beats(83, dt=0.2, _type='top', count=10),
+            *get_enemy_list_beats(85.5, dt=0.2, _type='bottom', count=10),
+            *get_enemy_list_beats(88, dt=0.2, _type='left', count=10),
+            *get_enemy_list_beats(90.5, dt=0.2, _type='right', count=10),
+        ]
+
+        self.current_enemy_timestamp = 0
+        self.current_timestamp = 0
+
+    @property
+    def pos(self):
+        return self.x, self.y
+
     def launch_ray(self, player: Player = None):
-        # player = None
-        # for i in self.object_manager.objects:
-        #     if isinstance(i, Player):
-        #         player = i
         if player:
             self.object_manager.add(
                 LineRay(self.x, self.y, player.x, player.y)
@@ -513,23 +829,104 @@ class LineEnemy(Enemy):
 
     def use_ai(self, player: 'Player'):
         super().use_ai(player)
-        if self.phase_timer.tick:
-            self.phase += 1
-        if self.ray_timer.timeout == 0:
-            self.ray_timer.timeout = 1
-            self.launch_ray(player)
+        self.r *= 0.95
+        self.x += math.sin(time.time() * self.k) * self.k1
+        self.y += math.cos(time.time() * self.k) * self.k1
+        self.r = clamp(self.r, 10, 20)
+        # if self.phase_timer.tick:
+        #     self.phase += 1
         _bullets = []
-        if self.phase == 0:
-            if self.ray_timer.tick:
-                self.launch_ray(player)
-        self.object_manager.add_multiple(_bullets)
+        _enemies = []
+        try:
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > self.launching_patterns[self.current_timestamp][0]:
+                if self.launching_patterns[self.current_timestamp][2] == 'all':
+                    for i in range(0, 360, 30):
+                        dx = cos(radians(i))
+                        dy = sin(radians(i))
+                        try:
+                            v = self.launching_patterns[self.current_timestamp][2]
+                            dx *= v
+                            dy *= v
+                        except IndexError:
+                            pass
+                        _bullets.append(
+                            self.launching_patterns[self.current_timestamp][1](self.x, self.y, dx, dy)
+                        )
+                else:
+                    if self.launching_patterns[self.current_timestamp][2] == 'move':
+                        self.k = 5
+                        self.k1 = 2
+                    elif self.launching_patterns[self.current_timestamp][2] == 'line_ray':
+                        self.launch_ray(player)
+                    else:
+                        for i in self.launching_patterns[self.current_timestamp][2]:
+                            dx = cos(radians(i))
+                            dy = sin(radians(i))
+                            try:
+                                v = self.launching_patterns[self.current_timestamp][3]
+                                dx *= v
+                                dy *= v
+                            except IndexError:
+                                pass
+                            _bullets.append(
+                                self.launching_patterns[self.current_timestamp][1](self.x, self.y, dx, dy, length=15, speed=1)
+                                # LineBullet2((self.x, self.y), pygame.Vector2(1, 1))
+                            )
+                self.current_timestamp += 1
+                _c = 0
+                # print(Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK))
+                for i in self.launching_patterns:
+                    if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > i[0]:
+                        _c += 1
+                        continue
+                    else:
+                        # _c = self.launching_patterns.index(i)
+                        break
+                # if self.current_timestamp != _c:
+                #     _bullets.clear()
+                self.current_timestamp = _c
+        except IndexError:
+            pass
+
+        if _bullets:
+            self.object_manager.add_multiple(_bullets)
+            self.r = 20
+
+        # print(self.current_enemy_timestamp)
+        try:
+            curr = self.enemy_launch_patterns[self.current_enemy_timestamp]
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > curr[0]:
+                for i in range(len(curr[2])):
+                    pos = curr[2][i]
+                    target_pos = curr[3][i]
+                    _enemies.append(
+                        curr[1](pos, target_pos)
+                    )
+                self.current_enemy_timestamp += 1
+                _c = 0
+                for i in self.enemy_launch_patterns:
+                    if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > i[0]:
+                        _c += 1
+                        continue
+                    else:
+                        # _c = self.enemy_launch_patterns.index(i)
+                        break
+                if self.current_enemy_timestamp != _c:
+                    _enemies.clear()
+                self.current_enemy_timestamp = _c
+        except IndexError:
+            pass
+
+        if _enemies:
+            self.object_manager.add_multiple(_enemies)
+            self.r = 20
 
     def update(self, events: list[pygame.event.Event]):
         pass
 
     def draw(self, surf: pygame.Surface):
         pygame.draw.circle(surf, 'white', (self.x, self.y), self.r)
-        pygame.draw.circle(surf, 'red', (self.x, self.y), self.r, 2)
+        pygame.draw.circle(surf, 'blue', (self.x, self.y), self.r, 2)
 
 
 class QuadrilateralEnemy(Enemy):
@@ -690,6 +1087,7 @@ class ObjectManager:
         self._to_add: list[BaseObject] = []
         self.player = None
         self.player_pos = [0, 0]
+        self.collision_enabled = False
 
     def get_object_count(self, instance):
         c = 0
@@ -735,8 +1133,9 @@ class ObjectManager:
         for i in self.objects:
             # i.update(events)
             # TODO collisions
-            # if i.check_collision(self.player):
-            #     self.player.alive = False
+            if self.collision_enabled:
+                if i.check_collision(self.player):
+                    self.player.alive = False
             if isinstance(i, Enemy):
                 i.use_ai(self.player)
             else:

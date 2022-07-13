@@ -46,11 +46,17 @@ class Home(Menu):
             'quit', 'help', 'settings', 'play'
         ]
         self.manager.transition_manager.set_transition('fade')
+
+        def play():
+            Globals.set(UPCOMING_LEVEL, 'line')
+            self.manager.transition_manager.set_transition('fade')
+            self.manager.switch_mode('level-intro', transition=True)
+
         self.actions = [
             lambda: self.manager.switch_mode('quit'),
             lambda: self.manager.switch_mode('help', transition=True),
             lambda: ...,
-            lambda: self.manager.switch_mode('point', transition=True)
+            play
         ]
         self.selected = 3
 
@@ -173,6 +179,39 @@ class Intro(Menu):
         surf.fill(self.background)
 
 
+class LevelIntro(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        self.upcoming_level = Globals.get(UPCOMING_LEVEL)
+        if not self.upcoming_level:
+            self.upcoming_level = 'undefined'
+
+        self.callback = None
+
+        # def callback():
+        #     self.callback = True
+        #     self.manager.subtitle_manager.add(Subtitle(self.upcoming_level, 3, 50))
+
+        # self.manager.subtitle_manager.add(
+        #     Subtitle(self.upcoming_level, 3, 50, callback=callback)
+        # )
+        self.text = text(self.upcoming_level, size=50)
+        self.timer = Timer(3)
+
+    def update(self, events: list[pygame.event.Event]):
+        if self.timer.tick:
+            self.callback = True
+        if self.callback:
+            Globals.set(UPCOMING_LEVEL, '')
+            self.manager.transition_manager.set_transition('fade')
+            self.manager.switch_mode(self.upcoming_level, transition=True)
+            self.callback = None
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(self.background)
+        surf.blit(self.text, self.text.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+
+
 class Retry(Menu):
     def __init__(self, manager: 'MenuManager', name='menu'):
         super().__init__(manager, name)
@@ -246,6 +285,12 @@ class PointEnemyScene(Menu):
             self.manager.transition_manager.set_transition('square')
             self.manager.switch_mode('retry', reset=True, transition=True)
             self.manager.sound_manager.fade(500)
+        try:
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+                self.manager.transition_manager.set_transition('fade')
+                self.manager.switch_mode('home', transition=True)
+        except IndexError:
+            pass
         # if not self.manager.object_manager.objects:
         #     self.manager.switch_mode('line')
 
@@ -253,6 +298,9 @@ class PointEnemyScene(Menu):
         surf.fill(self.background)
         length = 400
         total_time = self.manager.sound_manager.total_length
+        if total_time == 0:
+            total_time = length
+        print(total_time)
         try:
             t = self.manager.sound_manager.elapsed_time
             t = map_to_range(t, 0, total_time, 0, length)
@@ -260,7 +308,7 @@ class PointEnemyScene(Menu):
             pygame.draw.rect(surf, '#FFFFFF', (WIDTH // 2 - length // 2, 20, length, 10), 2)
         except ZeroDivisionError:
             pass
-        surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
+        # surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
 class LineEnemyScene(Menu):
@@ -269,20 +317,36 @@ class LineEnemyScene(Menu):
         self.manager.object_manager.init()
         self.manager.object_manager.add(LineEnemy())
         self.manager.sound_manager.stop()
-        self.manager.sound_manager.play('lines', start=0)
+        self.manager.sound_manager.play('lines', start=92)
         self.theme_color = 'blue'
 
     def update(self, events: list[pygame.event.Event]):
         if not self.manager.object_manager.player.alive:
-            # print(self.name)
-            # self.reset()
             Globals.set(RETRY_MESSAGE, 'You are such a noob!')
             self.manager.transition_manager.set_transition('square')
             self.manager.switch_mode('retry', reset=True, transition=True)
             self.manager.sound_manager.fade(500)
+        try:
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+                self.manager.transition_manager.set_transition('fade')
+                self.manager.switch_mode('home', transition=True)
+        except IndexError:
+            pass
 
     def draw(self, surf: pygame.Surface):
         surf.fill(self.background)
+        length = 400
+        total_time = self.manager.sound_manager.total_length
+        if total_time == 0:
+            total_time = length
+        print(total_time)
+        try:
+            t = self.manager.sound_manager.elapsed_time
+            t = map_to_range(t, 0, total_time, 0, length)
+            pygame.draw.rect(surf, '#00AAFF', (WIDTH // 2 - length // 2, 20, t, 10))
+            pygame.draw.rect(surf, '#FFFFFF', (WIDTH // 2 - length // 2, 20, length, 10), 2)
+        except ZeroDivisionError:
+            pass
         surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
@@ -315,6 +379,81 @@ class QuadrilateralEnemyScene(Menu):
         surf.fill(self.background)
 
 
+class Settings(Menu):
+    G_ACC = (0, 10)
+    PIN_RAD = 10
+    PIN_BORDER_WIDTH = 2
+    PIN_COLOR = "BROWN"
+    PIN_HOVER_COLOR = "BLUE"
+    PIN_CLICK_COLOR = "GREEN"
+    PIN_BORDER_COLOR = "WHITE"
+
+    def __init__(self, manager, name):
+        super().__init__(manager, name)
+        self.notice_acc = pygame.Vector2(self.G_ACC)
+        self.notice_vel = pygame.Vector2(0, 0)
+        self.notice_pos = pygame.Vector2(WIDTH // 2, HEIGHT // 2)
+        self.notice_rect = pygame.Rect((0, 0), (2 * WIDTH // 3, 2 * HEIGHT // 3))
+        self.text = text("Under Maintenance!")
+        self.text_rect = self.text.get_rect()
+        self.text_rect.center = self.notice_rect.center = self.notice_pos
+        # self.image = pygame.transform.scale(pygame.image.load("logo.png"), (200, 200))
+        self.image = load_image(os.path.join(ASSETS, 'images', 'logo.png'), scale=0.5)
+        self.image_rect = self.image.get_rect(center=self.notice_pos)
+        self.pins = [
+            self.notice_rect.topleft,
+            self.notice_rect.topright,
+            self.notice_rect.bottomleft,
+            self.notice_rect.bottomright
+        ]
+        self.pin_state = [0, 0, 0, 0]  # 1 -> hover, 2 -> clicked
+        self.pin_to_del: Union[int, None] = None
+
+    def update(self, events: list[pygame.event.Event]):
+        dt = 0.16
+        if self.pin_to_del is not None:
+            v = self.pins[self.pin_to_del]
+            self.pins.pop(self.pin_to_del)
+            self.pin_state.pop(self.pin_to_del)
+            self.pin_to_del = None
+            self.manager.object_manager.add(PointClicked(*v))
+
+        if len(self.pins) == 0 and self.notice_rect.top <= WIDTH:
+            self.notice_vel += self.notice_acc * dt
+            self.notice_pos += self.notice_vel * dt
+            self.text_rect.center = self.notice_rect.center = self.notice_pos
+
+        for ev in events:
+            if ev.type == pygame.MOUSEMOTION:
+                for i in range(len(self.pins)):
+                    if pygame.Vector2(self.pins[i]).distance_squared_to(pygame.mouse.get_pos()) <= self.PIN_RAD ** 2:
+                        self.pin_state[i] = 1
+                    else:
+                        self.pin_state[i] = 0
+
+            if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                for i in range(len(self.pins)):
+                    if pygame.Vector2(self.pins[i]).distance_squared_to(pygame.mouse.get_pos()) <= self.PIN_RAD ** 2:
+                        self.pin_state[i] = 2
+                        self.pin_to_del = i
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(0)
+        surf.blit(self.image, self.image_rect)
+        if self.notice_rect.top <= WIDTH:
+            pygame.draw.rect(surf, "BLACK", self.notice_rect)
+            pygame.draw.rect(surf, "WHITE", self.notice_rect, width=2)
+            surf.blit(self.text, self.text_rect)
+        for i in range(len(self.pins)):
+            pygame.draw.circle(surf, self.PIN_BORDER_COLOR, self.pins[i], self.PIN_RAD + self.PIN_BORDER_WIDTH)
+            if self.pin_state[i] == 0:
+                pygame.draw.circle(surf, self.PIN_COLOR, self.pins[i], self.PIN_RAD)
+            if self.pin_state[i] == 1:
+                pygame.draw.circle(surf, self.PIN_HOVER_COLOR, self.pins[i], self.PIN_RAD)
+            if self.pin_state[i] == 2:
+                pygame.draw.circle(surf, self.PIN_CLICK_COLOR, self.pins[i], self.PIN_RAD)
+
+
 class MenuManager:
     # TODO implement StackBasedGameLoop
 
@@ -331,13 +470,14 @@ class MenuManager:
             'intro': Intro(self, 'intro'),
             'quit': Quit(self, 'quit'),
             'help': Help(self, 'help'),
+            'settings': Settings(self, 'settings'),
 
+            'level-intro': LevelIntro(self, 'level-intro'),
             'retry': Retry(self, 'retry'),
 
             'point': PointEnemyScene(self, 'point'),
             'line': LineEnemyScene(self, 'line'),
             'triangle': TriangleEnemyScene(self, 'triangle')
-
         }
         self.subtitle_manager.clear()
         self.object_manager.clear()
@@ -365,16 +505,24 @@ class MenuManager:
     def update(self, events: list[pygame.event.Event]):
         # print(self.transition_manager.transition.k)
         for e in events:
-            if e.type == pygame.MOUSEBUTTONDOWN:
-                if e.button == 1:
-                    self.object_manager.add(
-                        PointClicked(*pygame.mouse.get_pos())
-                    )
+            # if e.type == pygame.MOUSEBUTTONDOWN:
+            #     if e.button == 1:
+            #         self.object_manager.add(
+            #             PointClicked(*pygame.mouse.get_pos())
+            #         )
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_SPACE:
                     self.sound_manager.toggle_pause()
                 if e.key == pygame.K_r:
                     self.menu.reset()
+                if e.key == pygame.K_e:
+                    self.object_manager.collision_enabled = not self.object_manager.collision_enabled
+                    subtitle = ('pro' if self.object_manager.collision_enabled else 'noob')
+                    # self.subtitle_manager.add(
+                    #     Subtitle(f'{subtitle} Mode Enabled', 2, )
+                    # )
+                    for i in get_typed_subtitles(f'{subtitle} Mode Entered', pos=(WIDTH // 2, HEIGHT - 50)):
+                        self.subtitle_manager.add(i)
                 if e.key == pygame.K_KP_PLUS:
                     self.sound_manager.skip_to(self.sound_manager.elapsed_time + 1)
                 if e.key == pygame.K_KP_MINUS:

@@ -27,9 +27,11 @@ Globals.set(FIRST_TIME_PLAYED, False)
 Globals.set(FULL_PLAYED, False)
 Globals.set(RETRY_MESSAGE, '')
 Globals.set(CURRENT_LEVEL, '')
+Globals.set(UPCOMING_LEVEL, '')
 Globals.set(MUSIC_INIT, music_init)
 Globals.set(SOUND_VALUE, 0)
 Globals.set(ELAPSED_TIME_FOR_SOUNDTRACK, 0)
+Globals.set(TOTAL_DURATION_OF_SOUNDTRACK, 0)
 
 
 # TODO add subtitle manager
@@ -50,6 +52,11 @@ class Game:
                     sys.exit(0)
                 if e.type == pygame.KEYDOWN:
                     if e.key == pygame.K_ESCAPE:
+                        if self.manager.mode == 'home':
+                            sys.exit(0)
+                        else:
+                            self.manager.transition_manager.set_transition('fade')
+                            self.manager.switch_mode('home', transition=True)
                         sys.exit(0)
                     if e.key == pygame.K_f:
                         self.full_screen = not self.full_screen
