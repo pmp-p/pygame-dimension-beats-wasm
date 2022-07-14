@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Literal
 
 import pygame
+import pygame.gfxdraw
 
 FONT = os.path.abspath(os.path.join(ASSETS, 'fonts', 'ARCADECLASSIC (1).TTF'))
 
@@ -65,6 +66,51 @@ def dilute(color: tuple[int, int, int], factor):
     g = clamp(g, 0, 255)
     b = clamp(b, 0, 255)
     return r, g, b
+
+
+# class Triangle:
+#     def __init__(self, pos=(0, 0)):
+#         self.pos = pygame.Vector2(pos)
+#         # base triangle of side n
+#         root_3 = math.sqrt(3)
+#         self.points = [
+#             [0, -root_3 / 4], [-1]
+#         ]
+
+def get_triangle1(length=50, pos=(150, 150), angle=45):
+    root_3 = math.sqrt(3)
+    pos = pygame.Vector2(pos)
+    points = [
+        pygame.Vector2(0, -root_3 / 4),
+        pygame.Vector2(-0.5, root_3 / 4),
+        pygame.Vector2(0.5, root_3 / 4)
+    ]
+    for i in points:
+        i.rotate_ip(angle)
+        i *= length
+        i += pos
+    return points
+
+
+def get_triangle(length, pos, angle):
+    pos = pygame.Vector2(pos)
+    point_a = pygame.Vector2(0, -length)
+    point_b = point_a.rotate(120)
+    point_c = point_a.rotate(240)
+    points = [point_a, point_b, point_c]
+    for i in points:
+        i.rotate_ip(angle)
+        i += pos
+    return points
+
+
+def draw_triangle(surf: pygame.Surface, pos=(150, 150), color=(255, 255, 255), angle=45, length=50, width=0):
+    points = get_triangle(length, pos, angle)
+    pygame.draw.polygon(surf, color, points, width=width)
+    # if width > 0:
+    #     pygame.gfxdraw.polygon(surf, points, color)
+    # else:
+    #     pygame.gfxdraw.filled_polygon(surf, points, color)
 
 
 class Timer:

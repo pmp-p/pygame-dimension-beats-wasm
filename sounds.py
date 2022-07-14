@@ -135,6 +135,7 @@ class SoundManager:
         self.sound_durations = {
             'points': 153,
             'lines': 103,
+            'triangles': 84 - 5,
         }
         for i in self.config.keys():
             self.config[i] = os.path.abspath(os.path.join(ASSETS, 'sounds', self.config[i]))

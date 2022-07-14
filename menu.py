@@ -1,15 +1,10 @@
 import random
 import sys
 
-import pygame
-
-from transition import TransitionManager
-from subtitles import SubtitleManager, Subtitle, get_typed_subtitles
-from utils import *
 from objects import *
-from config import WIDTH, HEIGHT, Globals
 from sounds import SoundManager
-from constants import *
+from subtitles import SubtitleManager, Subtitle, get_typed_subtitles
+from transition import TransitionManager
 
 
 class Menu:
@@ -43,24 +38,21 @@ class Home(Menu):
     def __init__(self, manager: 'MenuManager', name='menu'):
         super().__init__(manager, name)
         self.options = [
-            'quit', 'help', 'settings', 'play'
+            'quit', 'help', 'settings', 'credits', 'play'
         ]
         self.manager.transition_manager.set_transition('fade')
-
-        def play():
-            Globals.set(UPCOMING_LEVEL, 'line')
-            self.manager.transition_manager.set_transition('fade')
-            self.manager.switch_mode('level-intro', transition=True)
 
         self.actions = [
             lambda: self.manager.switch_mode('quit'),
             lambda: self.manager.switch_mode('help', transition=True),
-            lambda: ...,
-            play
+            lambda: self.manager.switch_mode('settings', transition=True),
+            lambda: self.manager.switch_mode('credits', transition=True),
+            lambda: self.manager.switch_mode('level-select', transition=True)
         ]
-        self.selected = 3
+        self.selected = 0
 
     def update(self, events: list[pygame.event.Event]):
+        # self.manager.switch_mode('credits')
         for e in events:
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_DOWN:
@@ -76,13 +68,125 @@ class Home(Menu):
                         self.manager.transition_manager.set_transition('fade')
                         self.actions[self.selected]()
                     except IndexError:
-                        self.manager.switch_mode('game', reset=True, transition=False)
+                        pass
+                        # self.manager.switch_mode('game', reset=True, transition=False)
 
     def draw(self, surf: pygame.Surface):
         super().draw(surf)
         for i in range(len(self.options)):
             y = 200 + i * 75
-            surf.blit(text(self.options[i], 50, 'orange' if i == self.selected else 'white'), (150, y))
+            surf.blit(text(self.options[i], 50, 'orange' if i == self.selected else 'white'), (100, y))
+
+
+class LevelSelect(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        self.options = [
+            'point', 'line', 'triangle'
+        ]
+        self.manager.transition_manager.set_transition('fade')
+
+        self.selected = 0
+
+    def play(self):
+        Globals.set(FIRST_TIME_PLAYED, True)
+        Globals.set(UPCOMING_LEVEL, self.options[self.selected])
+        self.manager.transition_manager.set_transition('fade')
+        self.manager.switch_mode('level-intro', transition=True)
+
+    def update(self, events: list[pygame.event.Event]):
+        # self.manager.switch_mode('credits')
+        for e in events:
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_DOWN:
+                    self.selected += 1
+                    self.selected %= len(self.options)
+                    self.manager.sound_manager.play_sound('ping')
+                if e.key == pygame.K_UP:
+                    self.selected -= 1
+                    self.selected %= len(self.options)
+                    self.manager.sound_manager.play_sound('ping')
+                if e.key == pygame.K_RETURN or e.key == pygame.K_KP_ENTER:
+                    try:
+                        self.manager.transition_manager.set_transition('fade')
+                        self.play()
+                    except IndexError:
+                        pass
+
+    def draw(self, surf: pygame.Surface):
+        surf.fill(self.background)
+        pygame.draw.rect(surf, 'white', surf.get_rect().inflate(-20, -200).move(0, 100 - 10), 3)
+        surf.blit(text("Select Level", size=100, aliased=False), (50, 50))
+        for i in range(len(self.options)):
+            y = 200 + i * 75
+            surf.blit(text(self.options[i], 50, 'orange' if i == self.selected else 'white'), (100, y))
+
+
+class Credits(Menu):
+    def __init__(self, manager: 'MenuManager', name='menu'):
+        super().__init__(manager, name)
+        self.options = [
+            'spooky', 'mrpoly', 'captain', 'tank king', "pygame"
+        ]
+        self.credits = [
+            'He made amazing soundtracks!', 'we used their cool soundtrack!', 'programmed random stuff', 'programmed other random stuff',
+            "obviously!"
+        ]
+        self.manager.transition_manager.set_transition('fade')
+
+        self.actions = [
+            lambda: self.link('https://okno.itch.io'),
+            lambda: self.link('https://opengameart.org/users/mrpoly'),
+            lambda: self.link(''),
+            lambda: self.link('https://tank-king.itch.io'),
+        ]
+        self.selected = 0
+        self.display_credits()
+
+    def display_credits(self, _credits=None):
+        if not _credits:
+            _credits = self.credits[self.selected]
+        self.manager.subtitle_manager.clear()
+        for i in get_typed_subtitles(_credits, _time=99, pos=(WIDTH // 2, HEIGHT - 50)):
+            self.manager.subtitle_manager.add(i)
+
+    def link(self, _link):
+        if _link:
+            try:
+                import webbrowser
+                webbrowser.open(_link)
+                self.display_credits('Link opened in Browser')
+            except Exception as e:
+                print(e)
+                self.display_credits('An Error Occurred')
+        else:
+            self.display_credits('No contact info for this person')
+
+    def update(self, events: list[pygame.event.Event]):
+        for e in events:
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_DOWN:
+                    self.selected += 1
+                    self.selected %= len(self.options)
+                    self.manager.sound_manager.play_sound('ping')
+                    self.display_credits()
+                if e.key == pygame.K_UP:
+                    self.selected -= 1
+                    self.selected %= len(self.options)
+                    self.manager.sound_manager.play_sound('ping')
+                    self.display_credits()
+                if e.key == pygame.K_RETURN or e.key == pygame.K_KP_ENTER:
+                    try:
+                        self.manager.transition_manager.set_transition('fade')
+                        self.actions[self.selected]()
+                    except IndexError:
+                        self.manager.switch_mode('game', reset=True, transition=False)
+
+    def draw(self, surf: pygame.Surface):
+        super().draw(surf)
+        for i in range(len(self.options)):
+            y = 200 + i * 60
+            surf.blit(text(self.options[i], 50, 'orange' if i == self.selected else 'white'), (100, y))
 
 
 class Quit(Menu):
@@ -94,23 +198,27 @@ class Quit(Menu):
             _text = random.choice(
                 [
                     'Play The Game First Idiot!',
-                    'Never Quit!',
-                    'Just Play The Game!'
+                    'First Play The Game You Noob!',
+                    'Just Play The Game!',
+                    'Select the Play option idiot!',
+                    'not until you play you noob!',
+                    'you need to play at least once',
+                    'find a way other than playing',
                 ]
-            ).split(' ')
+            )
 
             for i in range(len(_text)):
                 self.manager.subtitle_manager.add(
                     Subtitle(
-                        ' '.join(_text[0:i + 1]),
-                        time=0.3 if i != len(_text) - 1 else 2
+                        ''.join(_text[0:i + 1]),
+                        time=0.05 if i != len(_text) - 1 else 2
                     )
                 )
 
     def update(self, events: list[pygame.event.Event]):
         manager = self.manager.subtitle_manager
         if not manager.subtitles and not manager.current_subtitle:
-            self.manager.switch_mode('home', reset=False)
+            self.manager.switch_mode('home', reset=False, transition=True)
 
     def draw(self, surf: pygame.Surface):
         super().draw(surf)
@@ -118,42 +226,21 @@ class Quit(Menu):
 
 class Help(Menu):
     def draw(self, surf: pygame.Surface):
-        super().draw(surf)
-        t = text('We dont do that here')
-        surf.blit(t, t.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
-
-
-class Game(Menu):
-    def __init__(self, manager: 'MenuManager', name='menu'):
-        super().__init__(manager, name)
-        self.options = [
-            'play', 'the', 'game'
+        _text = [
+            'WASD or arrows to move',
+            'hold shift to move faster',
+            'e to toggle difficulty',
+            'f to toggle fullscreen',
+            'escape to go back'
         ]
-        self.actions = [
-
-        ]
-        self.selected = 0
-
-    def update(self, events: list[pygame.event.Event]):
-        for e in events:
-            if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_DOWN:
-                    self.selected += 1
-                    self.selected %= len(self.options)
-                if e.key == pygame.K_UP:
-                    self.selected -= 1
-                    self.selected %= len(self.options)
-                if e.key == pygame.K_RETURN or e.key == pygame.K_KP_ENTER:
-                    try:
-                        self.actions[self.selected]()
-                    except IndexError:
-                        self.manager.switch_mode('home', reset=False, transition=False)
-
-    def draw(self, surf: pygame.Surface):
         super().draw(surf)
-        for i in range(len(self.options)):
-            y = 200 + i * 75
-            surf.blit(text(self.options[i], 50, 'orange' if i == self.selected else 'white'), (150, y))
+        t = text('We dont do that here but...', size=35)
+        surf.blit(t, t.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50)))
+        y = HEIGHT // 2
+        for i in _text:
+            t = text(i, size=25)
+            surf.blit(t, t.get_rect(center=(WIDTH // 2, y)))
+            y += 50
 
 
 class Intro(Menu):
@@ -278,18 +365,22 @@ class PointEnemyScene(Menu):
         self.theme_color = 'red'
 
     def update(self, events: list[pygame.event.Event]):
-        if not self.manager.object_manager.player.alive:
-            # print(self.name)
-            # self.reset()
-            Globals.set(RETRY_MESSAGE, 'You are such a noob!')
-            self.manager.transition_manager.set_transition('square')
-            self.manager.switch_mode('retry', reset=True, transition=True)
-            self.manager.sound_manager.fade(500)
         try:
-            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
-                self.manager.transition_manager.set_transition('fade')
-                self.manager.switch_mode('home', transition=True)
-        except IndexError:
+            if not self.manager.object_manager.player.alive:
+                # print(self.name)
+                # self.reset()
+                Globals.set(RETRY_MESSAGE, 'Press E to play in easy mode')
+                self.manager.transition_manager.set_transition(random.choice(['square', 'circle']))
+                self.manager.switch_mode('retry', reset=True, transition=True)
+                self.manager.sound_manager.fade(500)
+            try:
+                if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+                    Globals.set(UPCOMING_LEVEL, 'line')
+                    self.manager.transition_manager.set_transition('fade')
+                    self.manager.switch_mode('level-intro', transition=True)
+            except TypeError:
+                pass
+        except AttributeError:
             pass
         # if not self.manager.object_manager.objects:
         #     self.manager.switch_mode('line')
@@ -300,7 +391,6 @@ class PointEnemyScene(Menu):
         total_time = self.manager.sound_manager.total_length
         if total_time == 0:
             total_time = length
-        print(total_time)
         try:
             t = self.manager.sound_manager.elapsed_time
             t = map_to_range(t, 0, total_time, 0, length)
@@ -317,20 +407,25 @@ class LineEnemyScene(Menu):
         self.manager.object_manager.init()
         self.manager.object_manager.add(LineEnemy())
         self.manager.sound_manager.stop()
-        self.manager.sound_manager.play('lines', start=92)
+        self.manager.sound_manager.play('lines', start=0)
         self.theme_color = 'blue'
+        # self.background = (0, 0, 5)
 
     def update(self, events: list[pygame.event.Event]):
-        if not self.manager.object_manager.player.alive:
-            Globals.set(RETRY_MESSAGE, 'You are such a noob!')
-            self.manager.transition_manager.set_transition('square')
-            self.manager.switch_mode('retry', reset=True, transition=True)
-            self.manager.sound_manager.fade(500)
+        try:
+            if not self.manager.object_manager.player.alive:
+                Globals.set(RETRY_MESSAGE, 'Press E to play in easy mode')
+                self.manager.transition_manager.set_transition(random.choice(['square', 'circle']))
+                self.manager.switch_mode('retry', reset=True, transition=True)
+                self.manager.sound_manager.fade(500)
+        except AttributeError:
+            pass
         try:
             if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+                Globals.set(UPCOMING_LEVEL, 'triangle')
                 self.manager.transition_manager.set_transition('fade')
-                self.manager.switch_mode('home', transition=True)
-        except IndexError:
+                self.manager.switch_mode('level-intro', transition=True)
+        except TypeError:
             pass
 
     def draw(self, surf: pygame.Surface):
@@ -339,15 +434,15 @@ class LineEnemyScene(Menu):
         total_time = self.manager.sound_manager.total_length
         if total_time == 0:
             total_time = length
-        print(total_time)
+        # print(total_time)
         try:
             t = self.manager.sound_manager.elapsed_time
             t = map_to_range(t, 0, total_time, 0, length)
-            pygame.draw.rect(surf, '#00AAFF', (WIDTH // 2 - length // 2, 20, t, 10))
+            pygame.draw.rect(surf, '#0055FF', (WIDTH // 2 - length // 2, 20, t, 10))
             pygame.draw.rect(surf, '#FFFFFF', (WIDTH // 2 - length // 2, 20, length, 10), 2)
         except ZeroDivisionError:
             pass
-        surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
+        # surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
 class TriangleEnemyScene(Menu):
@@ -355,14 +450,45 @@ class TriangleEnemyScene(Menu):
         super().__init__(manager, name)
         self.manager.object_manager.init()
         self.manager.object_manager.add(TriangleEnemy())
+        self.manager.sound_manager.stop()
+        self.manager.sound_manager.play('triangles', start=0)
 
     def update(self, events: list[pygame.event.Event]):
-        pass
-        # if not self.manager.object_manager.objects:
-        #     self.manager.switch_mode('home')
+        try:
+            if not self.manager.object_manager.player.alive:
+                Globals.set(RETRY_MESSAGE, 'Press E to play in easy mode')
+                self.manager.transition_manager.set_transition(random.choice(['square', 'circle']))
+                self.manager.switch_mode('retry', reset=True, transition=True)
+                self.manager.sound_manager.fade(500)
+        except AttributeError:
+            pass
+        try:
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK):
+                self.manager.transition_manager.set_transition('fade')
+                self.manager.switch_mode('credits', transition=True)
+        except TypeError:
+            pass
+        try:
+            if Globals.get(ELAPSED_TIME_FOR_SOUNDTRACK) > Globals.get(TOTAL_DURATION_OF_SOUNDTRACK) - 0.5:
+                self.manager.sound_manager.fade(500)
+        except TypeError:
+            pass
 
     def draw(self, surf: pygame.Surface):
         surf.fill(self.background)
+        length = 400
+        total_time = self.manager.sound_manager.total_length
+        if total_time == 0:
+            total_time = length
+        # print(total_time)
+        try:
+            t = self.manager.sound_manager.elapsed_time
+            t = map_to_range(t, 0, total_time, 0, length)
+            pygame.draw.rect(surf, '#0055FF', (WIDTH // 2 - length // 2, 20, t, 10))
+            pygame.draw.rect(surf, '#FFFFFF', (WIDTH // 2 - length // 2, 20, length, 10), 2)
+        except ZeroDivisionError:
+            pass
+        # surf.blit(text(self.manager.sound_manager.elapsed_time.__str__()), (0, 0))
 
 
 class QuadrilateralEnemyScene(Menu):
@@ -387,19 +513,32 @@ class Settings(Menu):
     PIN_HOVER_COLOR = "BLUE"
     PIN_CLICK_COLOR = "GREEN"
     PIN_BORDER_COLOR = "WHITE"
+    CREDIT_TEXT_GAP = 40
+    CREDIT_TEXT_POSY = 150
 
     def __init__(self, manager, name):
         super().__init__(manager, name)
         self.notice_acc = pygame.Vector2(self.G_ACC)
         self.notice_vel = pygame.Vector2(0, 0)
         self.notice_pos = pygame.Vector2(WIDTH // 2, HEIGHT // 2)
-        self.notice_rect = pygame.Rect((0, 0), (2 * WIDTH // 3, 2 * HEIGHT // 3))
+        self.notice_rect = pygame.Rect((0, 0), (2.2 * WIDTH // 3, 2.2 * HEIGHT // 3))
         self.text = text("Under Maintenance!")
         self.text_rect = self.text.get_rect()
         self.text_rect.center = self.notice_rect.center = self.notice_pos
+        self.credit_texts = [
+            text("You found the Easter Egg!", 30),
+            text("Thank You for trying out the game!", 30),
+            text("If you liked playing this", 30),
+            text("Please Rate Us for the jam!", 30),
+        ]
+        self.credit_text_rects = [
+            self.credit_texts[i].get_rect(
+                center=(self.notice_pos.x, self.CREDIT_TEXT_POSY + self.CREDIT_TEXT_GAP * i)
+            ) for i in range(len(self.credit_texts))
+        ]
         # self.image = pygame.transform.scale(pygame.image.load("logo.png"), (200, 200))
-        self.image = load_image(os.path.join(ASSETS, 'images', 'logo.png'), scale=0.5)
-        self.image_rect = self.image.get_rect(center=self.notice_pos)
+        self.image = load_image(os.path.join(ASSETS, 'images', 'logo.png'), scale=0.3)
+        self.image_rect = self.image.get_rect(center=(self.notice_pos.x, 400))
         self.pins = [
             self.notice_rect.topleft,
             self.notice_rect.topright,
@@ -440,6 +579,8 @@ class Settings(Menu):
     def draw(self, surf: pygame.Surface):
         surf.fill(0)
         surf.blit(self.image, self.image_rect)
+        for i in range(len(self.credit_texts)):
+            surf.blit(self.credit_texts[i], self.credit_text_rects[i])
         if self.notice_rect.top <= WIDTH:
             pygame.draw.rect(surf, "BLACK", self.notice_rect)
             pygame.draw.rect(surf, "WHITE", self.notice_rect, width=2)
@@ -466,12 +607,13 @@ class MenuManager:
         self.sound_manager = SoundManager()
         self.menus = {
             'home': Home(self, 'home'),
-            'game': Game(self, 'game'),
             'intro': Intro(self, 'intro'),
             'quit': Quit(self, 'quit'),
             'help': Help(self, 'help'),
             'settings': Settings(self, 'settings'),
+            'credits': Credits(self, 'credits'),
 
+            'level-select': LevelSelect(self, 'level-select'),
             'level-intro': LevelIntro(self, 'level-intro'),
             'retry': Retry(self, 'retry'),
 
@@ -481,7 +623,7 @@ class MenuManager:
         }
         self.subtitle_manager.clear()
         self.object_manager.clear()
-        self.mode = 'line'  # initial mode
+        self.mode = 'home'  # initial mode
         self.menu = self.menus[self.mode]
         self.sound_manager.stop()
         self.menu.reset()
@@ -491,6 +633,8 @@ class MenuManager:
 
     def switch_mode(self, mode, reset=True, transition=False):
         if mode in self.menus:
+            self.object_manager.clear()
+            self.subtitle_manager.clear()
             if transition:
                 self.to_switch = mode
                 self.to_reset = reset
@@ -511,10 +655,10 @@ class MenuManager:
             #             PointClicked(*pygame.mouse.get_pos())
             #         )
             if e.type == pygame.KEYDOWN:
-                if e.key == pygame.K_SPACE:
-                    self.sound_manager.toggle_pause()
-                if e.key == pygame.K_r:
-                    self.menu.reset()
+                # if e.key == pygame.K_SPACE:
+                #     self.sound_manager.toggle_pause()
+                # if e.key == pygame.K_r:
+                #     self.menu.reset()
                 if e.key == pygame.K_e:
                     self.object_manager.collision_enabled = not self.object_manager.collision_enabled
                     subtitle = ('pro' if self.object_manager.collision_enabled else 'noob')
@@ -524,10 +668,10 @@ class MenuManager:
                     for i in get_typed_subtitles(f'{subtitle} Mode Entered', pos=(WIDTH // 2, HEIGHT - 50)):
                         self.subtitle_manager.add(i)
                 if e.key == pygame.K_KP_PLUS:
-                    self.sound_manager.skip_to(self.sound_manager.elapsed_time + 1)
-                if e.key == pygame.K_KP_MINUS:
-                    self.sound_manager.skip_to(self.sound_manager.elapsed_time - 1)
-                    # self.sound_manager.reset()
+                    self.sound_manager.skip_to(self.sound_manager.elapsed_time + 10)
+                # if e.key == pygame.K_KP_MINUS:
+                #     self.sound_manager.skip_to(self.sound_manager.elapsed_time - 10)
+                # self.sound_manager.reset()
         # print(self.sound_manager.elapsed_time)
         if self.to_switch != 'none':
             if self.transition_manager.transition.status == 'closed':

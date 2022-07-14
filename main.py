@@ -1,10 +1,7 @@
-import pygame
-
 from config import *
+from constants import *
 from menu import MenuManager
 from utils import *
-from constants import *
-from sounds import SoundManager
 
 music_init = False
 
@@ -53,11 +50,14 @@ class Game:
                 if e.type == pygame.KEYDOWN:
                     if e.key == pygame.K_ESCAPE:
                         if self.manager.mode == 'home':
-                            sys.exit(0)
+                            if Globals.get(FIRST_TIME_PLAYED):
+                                sys.exit(0)
                         else:
                             self.manager.transition_manager.set_transition('fade')
-                            self.manager.switch_mode('home', transition=True)
-                        sys.exit(0)
+                            self.manager.subtitle_manager.clear()
+                            if self.manager.mode not in ('point', 'line', 'triangle'):
+                                self.manager.switch_mode('home', reset=False, transition=True)
+                        # sys.exit(0)
                     if e.key == pygame.K_f:
                         self.full_screen = not self.full_screen
                         if self.full_screen:

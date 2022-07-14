@@ -54,13 +54,16 @@ class SubtitleManager:
     def update(self):
         if self.current_subtitle:
             self.current_subtitle.update()
-            if self.current_subtitle.done:
-                self.current_subtitle = None
-                try:
-                    self.current_subtitle = self.subtitles.pop(0)
-                    self.current_subtitle.timer.reset()
-                except IndexError:
-                    pass
+            try:
+                if self.current_subtitle.done:
+                    self.current_subtitle = None
+                    try:
+                        self.current_subtitle = self.subtitles.pop(0)
+                        self.current_subtitle.timer.reset()
+                    except IndexError:
+                        pass
+            except Exception as e:
+                print(e)
         else:
             try:
                 self.current_subtitle = self.subtitles.pop(0)
