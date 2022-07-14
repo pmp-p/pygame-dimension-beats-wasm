@@ -1,3 +1,4 @@
+import asyncio
 from config import *
 from constants import *
 from menu import MenuManager
@@ -41,7 +42,7 @@ class Game:
         self.manager = MenuManager()
         self.clock = pygame.time.Clock()
 
-    def run(self):
+    async def run(self):
         while True:
             events = pygame.event.get()
             for e in events:
@@ -71,7 +72,7 @@ class Game:
             pygame.display.update()
             # print(self.clock.get_fps())
             self.clock.tick(FPS)
-
+            await asyncio.sleep(0)
 
 if __name__ == '__main__':
-    Game().run()
+    asyncio.run(Game().run())

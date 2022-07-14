@@ -2,7 +2,7 @@ import os
 import time
 
 import pygame
-import numpy
+#import numpy
 
 from typing import Union
 

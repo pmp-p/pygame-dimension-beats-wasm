@@ -8,7 +8,7 @@ from typing import Literal
 import pygame
 import pygame.gfxdraw
 
-FONT = os.path.abspath(os.path.join(ASSETS, 'fonts', 'ARCADECLASSIC (1).TTF'))
+FONT = os.path.abspath(os.path.join(ASSETS, 'fonts', 'ARCADECLASSIC.TTF'))
 
 
 # FONT = 'consolas'
